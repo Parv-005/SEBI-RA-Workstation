@@ -1,0 +1,72 @@
+{
+    "telegram": {
+        "api_id": "",
+        "api_hash": "",
+        "phone": "",
+        "group_id": ""
+    },
+    "angelone": {
+        "api_key": "",
+        "client_id": "",
+        "password": "",
+        "totp_secret": ""
+    },
+    "google_sheets": {
+        "service_account_json": "/home/pj/MyProjects/RandomStuff/SEBI_RA_Automation_Software/data/gen-lang-client-0475519263-e8683cc18813.json",
+        "spreadsheet_id": "1rneFTVmgArdki4McRXctZ1U8IwfliynyDHwkJByhtbw",
+        "sheet_name": "Trade_Test"
+    },
+    "image": {
+        "trade_template": "templates/trade_template.png",
+        "update_template": "templates/update_template.png",
+        "font_path": "",
+        "font_size": 24,
+        "font_color": [
+            255,
+            255,
+            255
+        ],
+        "positions": {
+            "stock_name": [
+                100,
+                50
+            ],
+            "segment": [
+                100,
+                90
+            ],
+            "action": [
+                100,
+                130
+            ],
+            "entry_price": [
+                100,
+                170
+            ],
+            "target": [
+                100,
+                210
+            ],
+            "stop_loss": [
+                100,
+                250
+            ],
+            "quantity": [
+                100,
+                290
+            ],
+            "timeframe": [
+                100,
+                330
+            ],
+            "risk_reward": [
+                100,
+                370
+            ],
+            "status": [
+                100,
+                410
+            ]
+        }
+    }
+}
