@@ -4,6 +4,7 @@ from database.db_manager import update_trade, insert_trade_update
 from utils.logger import setup_logger
 import asyncio
 import threading
+from utils.async_helper import run_async
 from services.image_generator import ImageGenerator
 from services.telegram_service import TelegramService
 from services.google_sheets_service import GoogleSheetsService
@@ -313,10 +314,7 @@ class UpdateForm(ctk.CTkToplevel):
                                 logger.error(f"Telegram send error: {e}", exc_info=True)
                                 raise
 
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        success = loop.run_until_complete(send_tg())
-                        loop.close()
+                        success = run_async(send_tg())
                         service_results["telegram"] = success if success else True
                     else:
                         service_results["telegram"] = "not_configured"

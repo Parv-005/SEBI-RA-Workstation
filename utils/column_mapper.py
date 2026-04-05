@@ -1,11 +1,28 @@
 """
-Centralized utility to map internal `trade_data` dictionaries to user-configured 
+Centralized utility to map internal `trade_data` dictionaries to user-configured
 Spreadsheet/XLSX header columns. Supports dynamic formulas.
 """
+
 from utils.constants_loader import get_constant
 from string import ascii_uppercase
 
-DEFAULT_HEADERS = get_constant("default_headers", [])
+_default_headers = None
+
+
+def _get_default_headers():
+    global _default_headers
+    if _default_headers is None:
+        try:
+            _default_headers = get_constant("default_headers", [])
+        except FileNotFoundError:
+            _default_headers = []
+    return _default_headers
+
+
+def DEFAULT_HEADERS():
+    """Lazy-loaded default headers to prevent import-time failures."""
+    return _get_default_headers()
+
 
 def col_idx_to_letter(col_idx: int) -> str:
     """Convert 1-based column index to letter (1 -> A, 2 -> B, 27 -> AA)."""
@@ -15,6 +32,7 @@ def col_idx_to_letter(col_idx: int) -> str:
         result = ascii_uppercase[remainder] + result
     return result
 
+
 def get_column_letter(headers: list, target_header: str) -> str:
     """Find a header's column index and return its Excel/Sheets letter. Returns 'A' if not found."""
     try:
@@ -23,22 +41,25 @@ def get_column_letter(headers: list, target_header: str) -> str:
     except ValueError:
         return "A"  # fallback
 
-def map_trade_to_columns(trade: dict, headers: list, is_google_sheets: bool = False, row_num: int = None) -> list:
+
+def map_trade_to_columns(
+    trade: dict, headers: list, is_google_sheets: bool = False, row_num: int = None
+) -> list:
     """
     Given an internal trade dict and a list of headers, build an ordered row list.
     If `is_google_sheets` is True and `row_num` is provided, live formulas are injected.
     """
     row = []
-    
+
     # Pre-calculate column letters for formulas
     sec_name_col = get_column_letter(headers, "Security Name")
     entry_col = get_column_letter(headers, "Entry Price")
     action_col = get_column_letter(headers, "LONG/SHORT")
     cmp_col = get_column_letter(headers, "CMP")
-    
+
     for header in headers:
         val = ""
-        
+
         # Simple Maps
         if header == "Trade Code":
             val = trade.get("trade_code", "")
@@ -74,7 +95,7 @@ def map_trade_to_columns(trade: dict, headers: list, is_google_sheets: bool = Fa
             val = trade.get("target", "")
         elif header == "Trade Status (ACTIVE/CLOSE)":
             val = trade.get("status", "ACTIVE")
-            
+
         # Complex/Derived Maps
         elif header == "Entry Price Zone":
             zs = trade.get("zone_start")
@@ -92,14 +113,14 @@ def map_trade_to_columns(trade: dict, headers: list, is_google_sheets: bool = Fa
             val = trade.get("exit_price", "")
         elif header == "Trade Exit DateTime":
             val = trade.get("exit_datetime", "")
-            
+
         elif header == "Holding Period":
             # For local XLSX we might do a text calculation if we wanted, but let's keep it simple
             if trade.get("exit_datetime") and trade.get("created_at"):
-                val = "Calculated externally" # Will enhance later if needed
+                val = "Calculated externally"  # Will enhance later if needed
             else:
                 val = ""
-                
+
         # Formula Injection
         elif header == "CMP":
             if is_google_sheets and row_num:
@@ -107,7 +128,7 @@ def map_trade_to_columns(trade: dict, headers: list, is_google_sheets: bool = Fa
                 val = f'=IF(ISBLANK({sec_name_col}{row_num}), "", GOOGLEFINANCE("NSE:"&{sec_name_col}{row_num}, "price"))'
             else:
                 val = ""
-                
+
         elif header == "Live PNL":
             if is_google_sheets and row_num:
                 # PNL formula depending on action being LONG or SHORT
@@ -124,39 +145,40 @@ def map_trade_to_columns(trade: dict, headers: list, is_google_sheets: bool = Fa
                 val = trade[internal_key]
             else:
                 val = ""
-                
+
         row.append(val)
-        
+
     return row
+
 
 def map_row_to_trade(row_dict: dict) -> dict:
     """Map a dictionary keyed by human-readable Headers back to an internal trade dict."""
     trade = {}
-    
+
     mapping = {
-         "Trade Code": "trade_code",
-         "LONG/SHORT": "action",
-         "Trade Type": "trade_type",
-         "Trade Given DateTime": "created_at",
-         "Security Name": "stock_name",
-         "Security CMP when Trade Given": "cmp_at_entry",
-         "Entry Price": "entry_price",
-         "Stop Loss": "stop_loss",
-         "Trade Instructions": "remarks",
-         "Risk Reward Ratio": "risk_reward",
-         "Risk": "risk",
-         "Reward": "reward",
-         "Approx Time": "approx_time",
-         "Target": "target",
-         "Trade Status (ACTIVE/CLOSE)": "status",
-         "Trade Close Narration": "close_narration",
-         "Trade Exit Price": "exit_price",
-         "Trade Exit DateTime": "exit_datetime",
+        "Trade Code": "trade_code",
+        "LONG/SHORT": "action",
+        "Trade Type": "trade_type",
+        "Trade Given DateTime": "created_at",
+        "Security Name": "stock_name",
+        "Security CMP when Trade Given": "cmp_at_entry",
+        "Entry Price": "entry_price",
+        "Stop Loss": "stop_loss",
+        "Trade Instructions": "remarks",
+        "Risk Reward Ratio": "risk_reward",
+        "Risk": "risk",
+        "Reward": "reward",
+        "Approx Time": "approx_time",
+        "Target": "target",
+        "Trade Status (ACTIVE/CLOSE)": "status",
+        "Trade Close Narration": "close_narration",
+        "Trade Exit Price": "exit_price",
+        "Trade Exit DateTime": "exit_datetime",
     }
-    
+
     if "id" in row_dict:
         trade["id"] = row_dict["id"]
-        
+
     for header, value in row_dict.items():
         if header in mapping:
             trade[mapping[header]] = value
@@ -174,5 +196,5 @@ def map_row_to_trade(row_dict: dict) -> dict:
             # Fallback
             internal_key = header.lower().replace(" ", "_").replace(":", "_")
             trade[internal_key] = value
-            
+
     return trade
