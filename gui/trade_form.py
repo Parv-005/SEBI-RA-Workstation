@@ -90,10 +90,14 @@ class TradeForm(ctk.CTkFrame):
 
         # Trade Type
         _field_label(ff, "Trade Type:", r, 0)
-        self.trade_type_var = ctk.StringVar(value="Intraday")
+        
+        from utils.constants_loader import get_constant
+        trade_types = get_constant("trade_types", ["Intraday", "BTST", "Positional", "Short-term", "Long-term"])
+
+        self.trade_type_var = ctk.StringVar(value=trade_types[0] if trade_types else "Intraday")
         self.trade_type_menu = ctk.CTkOptionMenu(
             ff, variable=self.trade_type_var,
-            values=["Intraday", "BTST", "Positional", "Short-term", "Long-term"]
+            values=trade_types
         )
         self.trade_type_menu.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
 
@@ -378,10 +382,29 @@ class TradeForm(ctk.CTkFrame):
                 img_path = img_gen.generate_trade_image(trade_data)
 
                 # 3. Update Google Sheets
+                from services.google_sheets_service import GoogleSheetsService, EmptySheetError
+                
+                def prompt_empty_sheet():
+                    ans = messagebox.askyesno("Empty Sheet", "The Google Sheet is currently empty.\n\nDo you want to fill the default headers automatically?")
+                    
+                    def run_after_prompt():
+                        try:
+                            gs = GoogleSheetsService()
+                            if ans:
+                                gs.connect()
+                                gs._write_header()
+                            gs.append_trade(trade_data, skip_header_check=True)
+                        except Exception as e:
+                            logger.error(f"Sheets Retry Error: {e}", exc_info=True)
+                            
+                    threading.Thread(target=run_after_prompt, daemon=True).start()
+
                 try:
                     gs = GoogleSheetsService()
                     if gs.is_configured():
                         gs.append_trade(trade_data)
+                except EmptySheetError:
+                    self.after(0, prompt_empty_sheet)
                 except Exception as e:
                     logger.error(f"Sheets Error: {e}", exc_info=True)
 

@@ -1,6 +1,5 @@
 SEGMENTS = ["Cash", "F&O", "MCX", "Currency", "Index"]
 ACTIONS = ["BUY", "SELL"]
-TIMEFRAMES = ["Intraday", "BTST", "Positional", "Short-term", "Long-term"]
 STATUSES = ["ACTIVE", "TARGET_HIT", "SL_HIT", "CLOSED", "EXITED"]
 UPDATE_TYPES = [
     "TARGET_HIT", "SL_HIT", "PARTIAL_PROFIT", "TRAIL_SL",
@@ -32,19 +31,13 @@ def validate_trade(data: dict) -> list[str]:
             except (ValueError, TypeError):
                 errors.append(f"{field.replace('_', ' ').title()} must be a valid number.")
 
-    qty = data.get("quantity")
-    if qty is None:
-        errors.append("Quantity is required.")
-    else:
-        try:
-            q = int(qty)
-            if q <= 0:
-                errors.append("Quantity must be a positive integer.")
-        except (ValueError, TypeError):
-            errors.append("Quantity must be a valid integer.")
+    # Trade Type logic (replaces deprecated timeframe terminology)
+    from utils.constants_loader import get_constant
+    trade_types = get_constant("trade_types", [])
 
-    if data.get("timeframe") not in TIMEFRAMES:
-        errors.append(f"Timeframe must be one of: {', '.join(TIMEFRAMES)}")
+    t_type = data.get("trade_type")
+    if t_type and trade_types and t_type not in trade_types:
+        errors.append(f"Trade Type must be one of: {', '.join(trade_types)}")
 
     if not errors:
         entry = float(data["entry_price"])

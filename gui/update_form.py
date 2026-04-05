@@ -137,8 +137,11 @@ class UpdateForm(ctk.CTkToplevel):
 
             elif update_type == "EXIT":
                 trade_updates["status"] = "EXITED"
+                trade_updates["close_narration"] = remarks
+                trade_updates["exit_datetime"] = __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 if new_val_str:
                     new_value = {"exit_price": float(new_val_str)}
+                    trade_updates["exit_price"] = float(new_val_str)
 
             elif update_type == "COST_TO_COST":
                 old_value = {"stop_loss": self.trade["stop_loss"]}

@@ -63,7 +63,7 @@ def test_database():
         dummy = dict(
             stock_name="TEST_STOCK", segment="Cash", action="BUY",
             entry_price=100.0, target=110.0, stop_loss=95.0,
-            quantity=10, timeframe="1D", risk_reward="2:1",
+            risk_reward="2:1",
             remarks="integration-test", status="ACTIVE", cmp_at_entry=101.0,
         )
         trade_id = insert_trade(dummy)
@@ -125,7 +125,7 @@ def test_image_generator():
         dummy_trade = dict(
             id=9999, stock_name="TEST_STOCK", segment="Cash", action="BUY",
             entry_price=100.0, target=110.0, stop_loss=95.0,
-            quantity=10, timeframe="1D", risk_reward="2:1", cmp_at_entry=101.0,
+            risk_reward="2:1", cmp_at_entry=101.0,
         )
 
         path = gen.generate_trade_image(dummy_trade)

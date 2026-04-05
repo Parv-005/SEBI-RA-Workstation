@@ -26,14 +26,9 @@ SETTINGS_PATH = DATA_DIR / "settings.json"
 
 # ─── Column definitions ────────────────────────────────────────────────────────
 
-TRADES_HEADERS = [
-    "id", "trade_code", "stock_name", "segment", "action",
-    "entry_price", "zone_start", "zone_end", "target", "stop_loss",
-    "trade_type", "approx_time",
-    "reward", "risk", "reward_pct", "risk_pct", "risk_reward",
-    "remarks", "status", "cmp_at_entry",
-    "created_at", "updated_at",
-]
+from utils.column_mapper import DEFAULT_HEADERS, map_row_to_trade, map_trade_to_columns
+
+TRADES_HEADERS = DEFAULT_HEADERS
 
 UPDATES_HEADERS = [
     "id", "trade_id", "update_type", "details",
@@ -55,9 +50,15 @@ def _load_wb(path: Path, headers: list) -> openpyxl.Workbook:
     wb.save(path)
     return wb
 
-def _wb_to_dicts(ws, headers: list) -> list[dict]:
-    """Read all data rows from a worksheet into a list of dicts."""
+def _wb_to_dicts(ws, headers: list = None) -> list[dict]:
+    """Read all data rows from a worksheet into a list of dicts. Maps them back to internal names."""
     rows = []
+    
+    # Actually fetch the headers from the sheet to be dynamic
+    sheet_headers = [c.value for c in ws[1]]
+    if not any(sheet_headers):
+        sheet_headers = headers if headers else DEFAULT_HEADERS
+        
     for row in ws.iter_rows(min_row=2, values_only=True):
         if all(v is None for v in row):
             continue
@@ -68,8 +69,14 @@ def _wb_to_dicts(ws, headers: list) -> list[dict]:
                 processed.append(v.strftime("%Y-%m-%d %H:%M:%S"))
             else:
                 processed.append(v)
-        rows.append(dict(zip(headers, processed)))
+        row_dict = dict(zip(sheet_headers, processed))
+        # If it's the trades sheet, map it back correctly:
+        if "update_type" not in sheet_headers: # hacky check to differentiate trades vs trade_updates sheet
+            rows.append(map_row_to_trade(row_dict))
+        else:
+            rows.append(row_dict)
     return rows
+
 
 def _save_trades(wb: openpyxl.Workbook):
     wb.save(TRADES_PATH)
@@ -118,47 +125,32 @@ def insert_trade(trade_data: dict) -> int:
     Also mutates trade_data in-place with id, trade_code, created_at, updated_at."""
     try:
         _ensure_data_dir()
-        wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
-        ws = wb.active
-
-        all_rows = _wb_to_dicts(ws, TRADES_HEADERS)
+        # Fetch existing headers
+        try:
+            wb = load_workbook(TRADES_PATH)
+            ws = wb.active
+            headers = [c.value for c in ws[1]]
+        except Exception:
+            wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
+            ws = wb.active
+            headers = TRADES_HEADERS
+            
+        all_rows = _wb_to_dicts(ws, headers)
         trade_code = _unique_trade_code(all_rows)
         trade_id   = _next_id(ws)
         now        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        row = [
-            trade_id,
-            trade_code,
-            trade_data.get("stock_name", ""),
-            trade_data.get("segment", ""),
-            trade_data.get("action", ""),
-            trade_data.get("entry_price"),
-            trade_data.get("zone_start"),
-            trade_data.get("zone_end"),
-            trade_data.get("target"),
-            trade_data.get("stop_loss"),
-            trade_data.get("trade_type", ""),
-            trade_data.get("approx_time", ""),
-            trade_data.get("reward"),
-            trade_data.get("risk"),
-            trade_data.get("reward_pct"),
-            trade_data.get("risk_pct"),
-            trade_data.get("risk_reward", ""),
-            trade_data.get("remarks", ""),
-            trade_data.get("status", "ACTIVE"),
-            trade_data.get("cmp_at_entry"),
-            now,  # created_at
-            now,  # updated_at
-        ]
-
-        ws.append(row)
-        _save_trades(wb)
-
-        # Mutate caller's dict so downstream services (Sheets, Telegram, etc.) get metadata
+        # Mutate caller's dict so mapping catches them
         trade_data["id"]         = trade_id
         trade_data["trade_code"] = trade_code
         trade_data["created_at"] = now
         trade_data["updated_at"] = now
+
+        # Map to columns
+        row = map_trade_to_columns(trade_data, headers, is_google_sheets=False)
+
+        ws.append(row)
+        _save_trades(wb)
 
         logger.info(f"Inserted trade ID {trade_id} code {trade_code} ({trade_data.get('stock_name')})")
         return trade_id
@@ -208,33 +200,37 @@ def get_all_trades(filters: dict | None = None) -> list[dict]:
 def update_trade(trade_id: int, fields: dict) -> bool:
     """Update columns for an existing trade row in trades.xlsx."""
     try:
+        # Fetch old trade and merge
+        trade_data = get_trade(trade_id)
+        if not trade_data:
+            logger.warning(f"Trade ID {trade_id} not found for update.")
+            return False
+            
+        trade_data.update(fields)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        trade_data["updated_at"] = now
+        
         wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
         ws = wb.active
 
-        header_row = [ws.cell(1, c).value for c in range(1, len(TRADES_HEADERS) + 1)]
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        headers = [c.value for c in ws[1]]
+        if not any(headers):
+            headers = TRADES_HEADERS
+
+        # Map to columns
+        row_arr = map_trade_to_columns(trade_data, headers, is_google_sheets=False)
 
         updated = False
         for row in ws.iter_rows(min_row=2):
-            if row[0].value == trade_id:
-                for key, value in fields.items():
-                    if key in ("id", "created_at"):
-                        continue
-                    if key in header_row:
-                        col_idx = header_row.index(key) + 1
-                        ws.cell(row=row[0].row, column=col_idx, value=value)
-                # Always update updated_at
-                if "updated_at" in header_row:
-                    upd_col = header_row.index("updated_at") + 1
-                    ws.cell(row=row[0].row, column=upd_col, value=now)
+            if row[0].value == trade_id:  # Column A is ALWAYS ID per map_trade_to_columns logic
+                for col_idx, val in enumerate(row_arr, start=1):
+                    ws.cell(row=row[0].row, column=col_idx, value=val)
                 updated = True
                 break
 
         if updated:
             _save_trades(wb)
             logger.info(f"Updated trade ID {trade_id} with {fields}")
-        else:
-            logger.warning(f"Trade ID {trade_id} not found for update.")
         return updated
     except Exception as e:
         logger.error(f"Error updating trade ID {trade_id}: {e}", exc_info=True)

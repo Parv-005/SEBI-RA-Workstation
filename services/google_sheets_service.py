@@ -14,6 +14,9 @@ SCOPES = [
 ]
 
 
+class EmptySheetError(Exception):
+    pass
+
 class GoogleSheetsService:
     def __init__(self):
         self.client = None
@@ -48,51 +51,36 @@ class GoogleSheetsService:
             except gspread.WorksheetNotFound:
                 logger.info(f"Worksheet {self.sheet_name} not found. Creating a new one.")
                 self.sheet = spreadsheet.add_worksheet(self.sheet_name, rows=1000, cols=26)
-                self._write_header()
+                # Do NOT auto-write header here per user request for GUI pop-up
         except Exception as e:
             logger.error(f"Failed to connect to Google Sheets: {e}", exc_info=True)
             raise
 
     def _write_header(self):
-        headers = [
-            "Trade Code", "DB ID", "Stock Name", "Segment", "Action",
-            "Entry Price", "Zone Start", "Zone End",
-            "Target", "Stop Loss",
-            "Trade Type", "Approx Time",
-            "Reward", "Risk", "Reward %", "Risk %", "Risk:Reward",
-            "CMP at Entry", "Status",
-            "Remarks", "Given At (Timestamp)", "Updated At",
-        ]
-        self.sheet.update("A1", [headers])
+        from utils.column_mapper import DEFAULT_HEADERS
+        self.sheet.update("A1", [DEFAULT_HEADERS])
 
-    def append_trade(self, trade: dict):
+    def append_trade(self, trade: dict, skip_header_check: bool = False):
         try:
             if not self.sheet:
                 self.connect()
-            row = [
-                trade.get("trade_code", ""),
-                trade.get("id", ""),
-                trade.get("stock_name", ""),
-                trade.get("segment", ""),
-                trade.get("action", ""),
-                trade.get("entry_price", ""),
-                trade.get("zone_start", ""),
-                trade.get("zone_end", ""),
-                trade.get("target", ""),
-                trade.get("stop_loss", ""),
-                trade.get("trade_type", ""),
-                trade.get("approx_time", ""),
-                trade.get("reward", ""),
-                trade.get("risk", ""),
-                trade.get("reward_pct", ""),
-                trade.get("risk_pct", ""),
-                trade.get("risk_reward", ""),
-                trade.get("cmp_at_entry", ""),
-                trade.get("status", "ACTIVE"),
-                trade.get("remarks", ""),
-                trade.get("created_at", ""),   # Timestamp from DB
-                trade.get("updated_at", ""),
-            ]
+            
+            # Fetch the actual headers from the sheet first
+            headers = self.sheet.row_values(1)
+            if not headers:
+                if not skip_header_check:
+                    raise EmptySheetError("Google Sheet is empty and requires initialization.")
+                else:
+                    from utils.column_mapper import DEFAULT_HEADERS
+                    headers = DEFAULT_HEADERS
+
+            # What is the row number this trade will be appended to?
+            # It's row count + 1 (for formulas)
+            row_num = len(self.sheet.col_values(1)) + 1
+            
+            from utils.column_mapper import map_trade_to_columns
+            row = map_trade_to_columns(trade, headers, is_google_sheets=True, row_num=row_num)
+            
             self.sheet.append_row(row, value_input_option="USER_ENTERED")
             logger.info(f"Appended trade {trade.get('trade_code')} to Google Sheets.")
         except Exception as e:
