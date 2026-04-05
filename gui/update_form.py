@@ -10,6 +10,7 @@ from services.google_sheets_service import GoogleSheetsService
 
 logger = setup_logger("UpdateForm")
 
+
 class UpdateForm(ctk.CTkToplevel):
     def __init__(self, master, trade, on_success_callback=None, **kwargs):
         super().__init__(master, **kwargs)
@@ -35,15 +36,29 @@ class UpdateForm(ctk.CTkToplevel):
             f"Target: {trade['target']} | "
             f"SL: {trade['stop_loss']}"
         )
-        ctk.CTkLabel(self, text=info_text, font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=20, padx=20)
+        ctk.CTkLabel(self, text=info_text, font=ctk.CTkFont(weight="bold")).grid(
+            row=0, column=0, pady=20, padx=20
+        )
 
         # Update Type Dropdown
-        ctk.CTkLabel(self, text="Select Update Type:").grid(row=1, column=0, sticky="w", padx=40)
+        ctk.CTkLabel(self, text="Select Update Type:").grid(
+            row=1, column=0, sticky="w", padx=40
+        )
         self.update_type_var = ctk.StringVar(value="TARGET_HIT")
         self.update_type_menu = ctk.CTkOptionMenu(
-            self, variable=self.update_type_var,
-            values=["TARGET_HIT", "SL_HIT", "PARTIAL_PROFIT", "TRAIL_SL", "COST_TO_COST", "EXIT", "MODIFY_TARGET", "MODIFY_SL"],
-            command=self.on_update_type_change
+            self,
+            variable=self.update_type_var,
+            values=[
+                "TARGET_HIT",
+                "SL_HIT",
+                "PARTIAL_PROFIT",
+                "TRAIL_SL",
+                "COST_TO_COST",
+                "EXIT",
+                "MODIFY_TARGET",
+                "MODIFY_SL",
+            ],
+            command=self.on_update_type_change,
         )
         self.update_type_menu.grid(row=2, column=0, sticky="ew", padx=40, pady=(5, 20))
 
@@ -57,7 +72,9 @@ class UpdateForm(ctk.CTkToplevel):
         self.new_value_entry = ctk.CTkEntry(self.dynamic_frame, placeholder_text="0.00")
 
         # Remarks
-        ctk.CTkLabel(self, text="Remarks / Details for Message:").grid(row=4, column=0, sticky="w", padx=40, pady=(20, 5))
+        ctk.CTkLabel(self, text="Remarks / Details for Message:").grid(
+            row=4, column=0, sticky="w", padx=40, pady=(20, 5)
+        )
         self.remarks_entry = ctk.CTkTextbox(self, height=80)
         self.remarks_entry.grid(row=5, column=0, sticky="ew", padx=40)
 
@@ -65,10 +82,14 @@ class UpdateForm(ctk.CTkToplevel):
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.btn_frame.grid(row=6, column=0, pady=30, padx=40, sticky="e")
 
-        self.cancel_btn = ctk.CTkButton(self.btn_frame, text="Cancel", fg_color="gray", command=self.destroy)
+        self.cancel_btn = ctk.CTkButton(
+            self.btn_frame, text="Cancel", fg_color="gray", command=self.destroy
+        )
         self.cancel_btn.grid(row=0, column=0, padx=10)
 
-        self.submit_btn = ctk.CTkButton(self.btn_frame, text="Broadcast Update", command=self.submit_update)
+        self.submit_btn = ctk.CTkButton(
+            self.btn_frame, text="Broadcast Update", command=self.submit_update
+        )
         self.submit_btn.grid(row=0, column=1)
 
         # Initialize UI state
@@ -82,15 +103,21 @@ class UpdateForm(ctk.CTkToplevel):
         if update_type in ["TRAIL_SL", "MODIFY_SL"]:
             self.new_value_label.configure(text="New Stop Loss:")
             self.new_value_label.grid(row=0, column=0, sticky="w", pady=10)
-            self.new_value_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), pady=10)
+            self.new_value_entry.grid(
+                row=0, column=1, sticky="ew", padx=(10, 0), pady=10
+            )
         elif update_type == "MODIFY_TARGET":
             self.new_value_label.configure(text="New Target:")
             self.new_value_label.grid(row=0, column=0, sticky="w", pady=10)
-            self.new_value_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), pady=10)
+            self.new_value_entry.grid(
+                row=0, column=1, sticky="ew", padx=(10, 0), pady=10
+            )
         elif update_type in ["EXIT", "PARTIAL_PROFIT"]:
             self.new_value_label.configure(text="Exit/Booked Price:")
             self.new_value_label.grid(row=0, column=0, sticky="w", pady=10)
-            self.new_value_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), pady=10)
+            self.new_value_entry.grid(
+                row=0, column=1, sticky="ew", padx=(10, 0), pady=10
+            )
 
         # Auto-fill defaults for remarks based on type
         defaults = {
@@ -116,15 +143,23 @@ class UpdateForm(ctk.CTkToplevel):
 
         try:
             if update_type in ["TRAIL_SL", "MODIFY_SL"]:
-                if not new_val_str: raise ValueError("New Stop Loss is required.")
-                new_sl = float(new_val_str)
+                if not new_val_str:
+                    raise ValueError("New Stop Loss is required.")
+                try:
+                    new_sl = float(new_val_str)
+                except ValueError:
+                    raise ValueError("New Stop Loss must be a valid number.")
                 old_value = {"stop_loss": self.trade["stop_loss"]}
                 new_value = {"stop_loss": new_sl}
                 trade_updates["stop_loss"] = new_sl
 
             elif update_type == "MODIFY_TARGET":
-                if not new_val_str: raise ValueError("New Target is required.")
-                new_tgt = float(new_val_str)
+                if not new_val_str:
+                    raise ValueError("New Target is required.")
+                try:
+                    new_tgt = float(new_val_str)
+                except ValueError:
+                    raise ValueError("New Target must be a valid number.")
                 old_value = {"target": self.trade["target"]}
                 new_value = {"target": new_tgt}
                 trade_updates["target"] = new_tgt
@@ -138,10 +173,16 @@ class UpdateForm(ctk.CTkToplevel):
             elif update_type == "EXIT":
                 trade_updates["status"] = "EXITED"
                 trade_updates["close_narration"] = remarks
-                trade_updates["exit_datetime"] = __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                trade_updates["exit_datetime"] = (
+                    __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )
                 if new_val_str:
-                    new_value = {"exit_price": float(new_val_str)}
-                    trade_updates["exit_price"] = float(new_val_str)
+                    try:
+                        exit_price = float(new_val_str)
+                    except ValueError:
+                        raise ValueError("Exit Price must be a valid number.")
+                    new_value = {"exit_price": exit_price}
+                    trade_updates["exit_price"] = exit_price
 
             elif update_type == "COST_TO_COST":
                 old_value = {"stop_loss": self.trade["stop_loss"]}
@@ -150,13 +191,25 @@ class UpdateForm(ctk.CTkToplevel):
 
             elif update_type == "PARTIAL_PROFIT":
                 if new_val_str:
-                    new_value = {"booked_price": float(new_val_str)}
+                    try:
+                        booked_price = float(new_val_str)
+                    except ValueError:
+                        raise ValueError("Booked Price must be a valid number.")
+                    new_value = {"booked_price": booked_price}
 
             # Recalculate Risk & Reward if SL or Target was modified
-            if update_type in ["TRAIL_SL", "MODIFY_SL", "MODIFY_TARGET", "COST_TO_COST"]:
-                entry = float(self.trade.get("entry_price", 0))
-                current_tgt = float(self.trade.get("target", 0))
-                current_sl = float(self.trade.get("stop_loss", 0))
+            if update_type in [
+                "TRAIL_SL",
+                "MODIFY_SL",
+                "MODIFY_TARGET",
+                "COST_TO_COST",
+            ]:
+                try:
+                    entry = float(self.trade.get("entry_price", 0) or 0)
+                    current_tgt = float(self.trade.get("target", 0) or 0)
+                    current_sl = float(self.trade.get("stop_loss", 0) or 0)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(f"Invalid trade price data: {e}")
 
                 mod_tgt = trade_updates.get("target", current_tgt)
                 mod_sl = trade_updates.get("stop_loss", current_sl)
@@ -182,19 +235,23 @@ class UpdateForm(ctk.CTkToplevel):
                 if calc_risk <= 0 or calc_reward < 0:
                     trade_updates["risk_reward"] = ""
                 else:
-                    trade_updates["risk_reward"] = f"1 : {(calc_reward / calc_risk):.2f}"
+                    trade_updates["risk_reward"] = (
+                        f"1 : {(calc_reward / calc_risk):.2f}"
+                    )
 
             # 1. Save to SQLite
             self.submit_btn.configure(text="Processing...", state="disabled")
 
             # Log update event
-            insert_trade_update({
-                "trade_id": self.trade["id"],
-                "update_type": update_type,
-                "details": remarks,
-                "old_value": old_value,
-                "new_value": new_value
-            })
+            insert_trade_update(
+                {
+                    "trade_id": self.trade["id"],
+                    "update_type": update_type,
+                    "details": remarks,
+                    "old_value": old_value,
+                    "new_value": new_value,
+                }
+            )
 
             # Apply changes to trade
             if trade_updates:
@@ -205,7 +262,7 @@ class UpdateForm(ctk.CTkToplevel):
                 "update_type": update_type,
                 "details": remarks,
                 "old_value": old_value,
-                "new_value": new_value
+                "new_value": new_value,
             }
             # Optional: propagate recalculations dynamically so updates are fully seen across platforms
             for k in ["reward", "risk", "reward_pct", "risk_pct", "risk_reward"]:
@@ -213,37 +270,61 @@ class UpdateForm(ctk.CTkToplevel):
                     update_data_dict[k] = trade_updates[k]
 
             def process_update():
+                service_results = {
+                    "google_sheets": None,
+                    "telegram": None,
+                    "image": None,
+                }
+
                 # 2. Generate Image
                 img_gen = ImageGenerator()
                 img_path = img_gen.generate_update_image(self.trade, update_data_dict)
+                service_results["image"] = img_path is not None
 
                 # 3. Update Google Sheets
                 try:
                     gs = GoogleSheetsService()
                     if gs.is_configured():
-                        gs.update_trade_row(self.trade["id"], update_data_dict, trade_updates)
+                        gs.update_trade_row(
+                            self.trade["id"], update_data_dict, trade_updates
+                        )
+                        service_results["google_sheets"] = True
+                    else:
+                        service_results["google_sheets"] = "not_configured"
                 except Exception as e:
                     logger.error(f"Sheets Update Error: {e}", exc_info=True)
+                    service_results["google_sheets"] = str(e)
 
                 # 4. Send Telegram Update
                 try:
                     tg = TelegramService()
                     if tg.is_configured():
+
                         async def send_tg():
-                            await tg.connect()
-                            from utils.message_formatter import format_trade_update
-                            msg = format_trade_update(self.trade, update_data_dict)
-                            await tg.send_update_message(msg, img_path)
-                            await tg.disconnect()
+                            try:
+                                await tg.connect()
+                                from utils.message_formatter import format_trade_update
+
+                                msg = format_trade_update(self.trade, update_data_dict)
+                                await tg.send_update_message(msg, img_path)
+                                await tg.disconnect()
+                                return True
+                            except Exception as e:
+                                logger.error(f"Telegram send error: {e}", exc_info=True)
+                                raise
 
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
-                        loop.run_until_complete(send_tg())
+                        success = loop.run_until_complete(send_tg())
                         loop.close()
+                        service_results["telegram"] = success if success else True
+                    else:
+                        service_results["telegram"] = "not_configured"
                 except Exception as e:
                     logger.error(f"Telegram Update Error: {e}", exc_info=True)
+                    service_results["telegram"] = str(e)
 
-                self.after(0, self._on_success)
+                self.after(0, self._on_update_complete, service_results)
 
             threading.Thread(target=process_update, daemon=True).start()
 
@@ -257,6 +338,48 @@ class UpdateForm(ctk.CTkToplevel):
 
     def _on_success(self):
         messagebox.showinfo("Success", "Update saved and broadcasted successfully!")
+        if self.on_success:
+            self.on_success()
+        self.destroy()
+
+    def _on_update_complete(self, results):
+        errors = []
+
+        gs_result = results.get("google_sheets")
+        tg_result = results.get("telegram")
+
+        if gs_result is None or gs_result == "not_configured":
+            if gs_result == "not_configured":
+                errors.append("Google Sheets: Not configured")
+            elif gs_result:
+                pass  # Success
+            else:
+                errors.append("Google Sheets: Failed")
+
+        if tg_result is None or tg_result == "not_configured":
+            if tg_result == "not_configured":
+                errors.append("Telegram: Not configured")
+            elif tg_result:
+                pass  # Success
+            else:
+                errors.append("Telegram: Failed")
+
+        if not errors:
+            messagebox.showinfo("Success", "Update saved and broadcasted successfully!")
+        elif len(errors) == 2:
+            messagebox.showwarning(
+                "Partial Success",
+                "Update saved to database, but broadcasting failed:\n\n"
+                + "\n".join(f"• {e}" for e in errors)
+                + "\n\nConfigure services in Settings to enable broadcasting.",
+            )
+        else:
+            messagebox.showwarning(
+                "Partial Success",
+                "Update saved, but some services failed:\n\n"
+                + "\n".join(f"• {e}" for e in errors),
+            )
+
         if self.on_success:
             self.on_success()
         self.destroy()
