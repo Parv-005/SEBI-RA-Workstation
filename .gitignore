@@ -30,3 +30,7 @@ Thumbs.db
 venv/
 .venv/
 env/
+opencode.json
+.env
+rough.py
+.ruff_cache/
