@@ -89,6 +89,28 @@ class GoogleSheetsService:
 
                     headers = DEFAULT_HEADERS()
 
+            # --- Check for Unmapped Columns ---
+            from utils.column_mapper import get_headers_schema
+            schema = get_headers_schema()
+            known_labels = [item.get("label") for item in schema]
+            unmapped = [h for h in headers if h not in known_labels and h.strip()]
+
+            if unmapped and not getattr(self, '_warned_unmapped', False):
+                self._warned_unmapped = True
+                import tkinter as tk
+                import tkinter.messagebox as messagebox
+                
+                msg = (
+                    "Warning: The following columns in your Google Sheet are NOT mapped in your local configuration:\n\n"
+                    f"{', '.join(unmapped)}\n\n"
+                    "Data for these columns will not be written. If you renamed these columns, please update your configuration to match."
+                )
+                if tk._default_root:
+                    tk._default_root.after(0, lambda m=msg: messagebox.showwarning("Unmapped Columns", m))
+                else:
+                    messagebox.showwarning("Unmapped Columns", msg)
+            # ----------------------------------
+
             # What is the row number this trade will be appended to?
             # It's row count + 1 (for formulas)
             row_num = len(self.sheet.col_values(1)) + 1
@@ -140,28 +162,49 @@ class GoogleSheetsService:
 
             row_num = cell.row
 
-            # Map update keys directly to header names
-            mapping = {
-                "target": "Target",
-                "stop_loss": "Stop Loss",
-                "status": "Status",
-                "remarks": "Remarks",
-                "updated_at": "Updated At",
-                "risk_reward": "Risk:Reward",
-                "reward": "Reward",
-                "risk": "Risk",
-                "reward_pct": "Reward %",
-                "risk_pct": "Risk %",
-            }
+            from utils.column_mapper import get_headers_schema
+            schema = get_headers_schema()
 
-            for key, header_name in mapping.items():
-                if key in update_data or (trade_updates and key in trade_updates):
+            # Process keys from both update_data and trade_updates
+            all_update_keys = set(list(update_data.keys()) + list(trade_updates.keys() if trade_updates else []))
+
+            for key in all_update_keys:
+                val = update_data.get(key) if key in update_data else (trade_updates or {}).get(key, "")
+                
+                # Fetch target header labels for this key via schema
+                schema_entry = next((item for item in schema if item.get("key") == key), None)
+                
+                header_names_to_try = []
+                if schema_entry:
+                    header_names_to_try.append(schema_entry.get("label"))
+                    # Fallbacks for backwards compatibility/user tweaks
+                    if key == "status":
+                        header_names_to_try.append("Status")
+                    elif key == "remarks":
+                        header_names_to_try.append("Remarks")
+                
+                # For specific ad-hoc fields we appended later not explicitly in schema
+                if key == "reward_pct":
+                    header_names_to_try.append("Reward %")
+                elif key == "risk_pct":
+                    header_names_to_try.append("Risk %")
+                elif key == "risk_reward":
+                    header_names_to_try.extend(["Risk:Reward", "Risk Reward Ratio"])
+                elif key == "updated_at":
+                    header_names_to_try.append("Updated At")
+                    
+                # Universal fallback
+                if not header_names_to_try:
+                    header_names_to_try.append(key.replace("_", " ").title())
+
+                # Find the matched column index in the sheet
+                for h_name in header_names_to_try:
                     try:
-                        col_idx = headers.index(header_name) + 1
-                        val = update_data.get(key) or (trade_updates or {}).get(key, "")
+                        col_idx = headers.index(h_name) + 1
                         self.sheet.update_cell(row_num, col_idx, val)
+                        break  # Updated successfully, move to next key
                     except ValueError:
-                        pass  # Ignore if that column header isn't in Google Sheets
+                        continue  # Keep trying fallback headers
 
             logger.info(f"Updated trade {trade_id} row in Google Sheets.")
             return True
