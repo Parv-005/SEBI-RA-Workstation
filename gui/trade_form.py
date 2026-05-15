@@ -208,6 +208,11 @@ class TradeForm(ctk.CTkFrame):
         self.target_var.trace_add("write", self._auto_calc_rr)
         self.sl_var.trace_add("write", self._auto_calc_rr)
 
+        self.zone_start_entry.bind("<FocusOut>", self._apply_zone_offsets)
+        self.zone_end_entry.bind("<FocusOut>", self._apply_zone_offsets)
+        self.zone_start_entry.bind("<KeyRelease-space>", self._apply_zone_offsets)
+        self.zone_end_entry.bind("<KeyRelease-space>", self._apply_zone_offsets)
+
     def update_action_color(self, *args):
         if self.action_var.get() == "LONG":
             self.action_menu.configure(
@@ -219,6 +224,85 @@ class TradeForm(ctk.CTkFrame):
                 fg_color=ACTION_COLORS["SHORT"], button_color=ACTION_COLORS["SHORT_HOVER"],
                 button_hover_color=ACTION_COLORS["SHORT_HOVER2"],
             )
+
+    def _apply_zone_offsets(self, event=None):
+        """
+        Resolves zone offset shorthand in-place on FocusOut or Spacebar.
+        Supported formats (entry_price = 100):
+          +-50  -> zone_start=50,  zone_end=150
+          +-5%  -> zone_start=95,  zone_end=105
+          -50   -> resolves that field to 50
+          +50   -> resolves that field to 150
+          200   -> plain number, left untouched (no sign = no action)
+        Auto-swaps start/end if start ends up larger than end.
+        """
+        import re
+
+        try:
+            entry_price = float(self.price_var.get() or 0)
+            if entry_price <= 0:
+                return
+        except ValueError:
+            return
+
+        _PATTERN = re.compile(r'^(\+-|-\+|-|\+)\s*([\d\.]+)\s*(%?)$')
+
+        def _resolve(raw):
+            raw = raw.strip()
+            if not raw:
+                return None
+            m = _PATTERN.match(raw)
+            if not m:
+                return None  # plain float or unrecognised — don't touch
+            sign = m.group(1)
+            num = float(m.group(2))
+            is_pct = m.group(3) == "%"
+            offset = (entry_price * num / 100.0) if is_pct else num
+
+            if sign in ("+-", "-+"):
+                return (entry_price - offset, entry_price + offset)
+            elif sign == "-":
+                return (entry_price - offset, None)
+            else:  # "+"
+                return (entry_price + offset, None)
+
+        z_start_str = self.zone_start_entry.get()
+        z_end_str = self.zone_end_entry.get()
+
+        start_result = _resolve(z_start_str)
+        end_result = _resolve(z_end_str)
+
+        if start_result is not None:
+            val_a, val_b = start_result
+            self.zone_start_entry.delete(0, "end")
+            self.zone_start_entry.insert(0, f"{val_a:g}")
+            if val_b is not None and not z_end_str.strip():
+                self.zone_end_entry.delete(0, "end")
+                self.zone_end_entry.insert(0, f"{val_b:g}")
+
+        if end_result is not None:
+            val_a, val_b = end_result
+            if val_b is not None:
+                if not z_start_str.strip():
+                    self.zone_start_entry.delete(0, "end")
+                    self.zone_start_entry.insert(0, f"{val_a:g}")
+                self.zone_end_entry.delete(0, "end")
+                self.zone_end_entry.insert(0, f"{val_b:g}")
+            else:
+                self.zone_end_entry.delete(0, "end")
+                self.zone_end_entry.insert(0, f"{val_a:g}")
+
+        try:
+            s = float(self.zone_start_entry.get().strip())
+            e = float(self.zone_end_entry.get().strip())
+            if s > e:
+                self.zone_start_entry.delete(0, "end")
+                self.zone_start_entry.insert(0, f"{e:g}")
+                self.zone_end_entry.delete(0, "end")
+                self.zone_end_entry.insert(0, f"{s:g}")
+        except ValueError:
+            pass
+
 
     def _auto_calc_rr(self, *args):
         try:
@@ -329,51 +413,75 @@ class TradeForm(ctk.CTkFrame):
         threading.Thread(target=background_fetch, daemon=True).start()
 
     def submit_trade(self):
-        try:
-            def _float_or_none(val):
-                v = val.strip() if val else ""
-                return float(v) if v else None
+        # ── Per-field numeric validation ─────────────────────────────────────
+        def _require_float(raw: str, label: str) -> float:
+            """Parse a float from raw string, raising ValueError with a clear message if invalid."""
+            v = raw.strip() if raw else ""
+            if not v:
+                raise ValueError(f"'{label}' cannot be empty.")
+            try:
+                return float(v)
+            except ValueError:
+                raise ValueError(f"'{label}' must be a numerical value. Got: '{v}'")
 
-            def _float_or_zero(val_str):
-                try:
-                    return float(val_str.replace("%", ""))
-                except ValueError:
-                    return 0.0
+        def _optional_float(raw: str, label: str):
+            """Parse an optional float — returns None if empty, raises if non-empty and non-numeric."""
+            v = raw.strip() if raw else ""
+            if not v:
+                return None
+            try:
+                return float(v)
+            except ValueError:
+                raise ValueError(f"'{label}' must be a numerical value. Got: '{v}'")
+
+        def _float_or_zero(val_str: str) -> float:
+            try:
+                return float(val_str.replace("%", ""))
+            except ValueError:
+                return 0.0
+
+        try:
+            stock_name = self.stock_entry.get().strip().upper()
+            if not stock_name:
+                raise ValueError("'Stock Name' cannot be empty.")
+
+            entry_price = _require_float(self.price_var.get(), "Entry Price")
+            target      = _require_float(self.target_var.get(), "Target Price")
+            stop_loss   = _require_float(self.sl_var.get(), "Stop Loss")
+            zone_start  = _optional_float(self.zone_start_entry.get(), "Zone Start")
+            zone_end    = _optional_float(self.zone_end_entry.get(), "Zone End")
+
+            if entry_price <= 0:
+                raise ValueError("'Entry Price' must be greater than 0.")
+            if target <= 0:
+                raise ValueError("'Target Price' must be greater than 0.")
+            if stop_loss <= 0:
+                raise ValueError("'Stop Loss' must be greater than 0.")
 
             trade_data = {
-                "stock_name": self.stock_entry.get().strip().upper(),
-                "segment": self.segment_var.get(),
-                "action": to_db_action(self.action_var.get()),
-                "entry_price": float(self.price_var.get() or 0),
-                "target": float(self.target_var.get() or 0),
-                "stop_loss": float(self.sl_var.get() or 0),
-                "trade_type": self.trade_type_var.get(),
+                "stock_name":  stock_name,
+                "segment":     self.segment_var.get(),
+                "action":      to_db_action(self.action_var.get()),
+                "entry_price": entry_price,
+                "target":      target,
+                "stop_loss":   stop_loss,
+                "trade_type":  self.trade_type_var.get(),
                 "approx_time": self.approx_time_entry.get().strip(),
-                "zone_start": _float_or_none(self.zone_start_entry.get()),
-                "zone_end": _float_or_none(self.zone_end_entry.get()),
-                "reward": _float_or_zero(self.reward_var.get()),
-                "risk": _float_or_zero(self.risk_var.get()),
-                "reward_pct": _float_or_zero(self.reward_pct_var.get()),
-                "risk_pct": _float_or_zero(self.risk_pct_var.get()),
+                "zone_start":  zone_start,
+                "zone_end":    zone_end,
+                "reward":      _float_or_zero(self.reward_var.get()),
+                "risk":        _float_or_zero(self.risk_var.get()),
+                "reward_pct":  _float_or_zero(self.reward_pct_var.get()),
+                "risk_pct":    _float_or_zero(self.risk_pct_var.get()),
                 "risk_reward": self.rr_var.get() if self.rr_var.get() != "—" else "",
-                "remarks": self.remarks_entry.get("1.0", "end-1c").strip(),
-                "status": "ACTIVE",
-                "cmp_at_entry": float(self.price_var.get() or 0),
+                "remarks":     self.remarks_entry.get("1.0", "end-1c").strip(),
+                "status":      "ACTIVE",
+                "cmp_at_entry": entry_price,
             }
-
-            if not trade_data["stock_name"]:
-                raise ValueError("Stock Name cannot be empty.")
-            if (
-                trade_data["entry_price"] <= 0
-                or trade_data["target"] <= 0
-                or trade_data["stop_loss"] <= 0
-            ):
-                raise ValueError(
-                    "Entry Price, Target, and Stop Loss must be greater than 0."
-                )
 
         except ValueError as e:
             messagebox.showerror("Validation Error", str(e))
+
             return
 
         self.submit_btn.configure(text="Processing...", state="disabled")
