@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from utils.constants import ACTION_DISPLAY_MAP, ACTION_DB_MAP, UPDATE_TYPE_DEFAULTS, UPDATE_TYPES
+from utils.constants import ACTION_DISPLAY_MAP, ACTION_DB_MAP
 from utils.logger import setup_logger
 
 logger = setup_logger("TradeService")
@@ -51,7 +51,7 @@ def to_display_action(db_action: str) -> str:
 
 
 def compute_update_fields(
-    trade: dict, update_type: str, new_value_str: str, remarks: str
+    trade: dict, update_type: str, dynamic_values: dict[str, str], remarks: str
 ) -> tuple[dict, dict | None, dict | None]:
     trade_id = trade.get("id", "?")
     logger.debug(f"compute_update_fields: trade_id={trade_id}, update_type={update_type}")
@@ -60,7 +60,8 @@ def compute_update_fields(
     new_value = None
 
     if update_type in ("TRAIL_SL", "MODIFY_SL"):
-        new_sl = float(new_value_str) if new_value_str else None
+        new_val_str = dynamic_values.get("New Stop Loss", "")
+        new_sl = float(new_val_str) if new_val_str else None
         if new_sl is None:
             raise ValueError("New Stop Loss is required.")
         old_value = {"stop_loss": trade["stop_loss"]}
@@ -68,27 +69,30 @@ def compute_update_fields(
         trade_updates["stop_loss"] = new_sl
 
     elif update_type == "MODIFY_TARGET":
-        new_tgt = float(new_value_str) if new_value_str else None
+        new_val_str = dynamic_values.get("New Target", "")
+        new_tgt = float(new_val_str) if new_val_str else None
         if new_tgt is None:
             raise ValueError("New Target is required.")
         old_value = {"target": trade["target"]}
         new_value = {"target": new_tgt}
         trade_updates["target"] = new_tgt
 
-    elif update_type == "TARGET_HIT":
-        trade_updates["status"] = "TARGET_HIT"
-
-    elif update_type == "SL_HIT":
-        trade_updates["status"] = "SL_HIT"
-
-    elif update_type == "EXIT":
+    elif update_type in ("TARGET_HIT", "SL_HIT", "EXIT"):
         from datetime import datetime
 
-        trade_updates["status"] = "EXITED"
-        trade_updates["close_narration"] = remarks
+        if update_type == "TARGET_HIT":
+            trade_updates["status"] = "TARGET_HIT"
+        elif update_type == "SL_HIT":
+            trade_updates["status"] = "SL_HIT"
+        elif update_type == "EXIT":
+            trade_updates["status"] = "EXITED"
+            trade_updates["close_narration"] = remarks
+
         trade_updates["exit_datetime"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if new_value_str:
-            exit_price = float(new_value_str)
+        
+        exit_val_str = dynamic_values.get("Exit Price", "")
+        if exit_val_str:
+            exit_price = float(exit_val_str)
             new_value = {"exit_price": exit_price}
             trade_updates["exit_price"] = exit_price
 
@@ -98,10 +102,25 @@ def compute_update_fields(
         trade_updates["stop_loss"] = trade["entry_price"]
 
     elif update_type == "PARTIAL_PROFIT":
-        if new_value_str:
-            booked_price = float(new_value_str)
-            new_value = {"booked_price": booked_price}
+        new_value = {}
+        old_value = {}
+        booked_val_str = dynamic_values.get("Booked Price", "")
+        if booked_val_str:
+            booked_price = float(booked_val_str)
+            new_value["booked_price"] = booked_price
             trade_updates["booked_price"] = booked_price
+            
+        new_sl_str = dynamic_values.get("New SL", "")
+        if new_sl_str:
+            new_sl = float(new_sl_str)
+            new_value["stop_loss"] = new_sl
+            trade_updates["stop_loss"] = new_sl
+            old_value["stop_loss"] = trade["stop_loss"]
+            
+        if not new_value:
+            new_value = None
+        if not old_value:
+            old_value = None
 
     if update_type in ("TRAIL_SL", "MODIFY_SL", "MODIFY_TARGET", "COST_TO_COST"):
         entry = float(trade.get("entry_price", 0) or 0)

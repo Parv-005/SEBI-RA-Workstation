@@ -6,7 +6,8 @@ from database.db_manager import update_trade, insert_trade_update
 from utils.logger import setup_logger
 import threading
 from services.trade_service import compute_update_fields
-from utils.constants import UPDATE_TYPES, UPDATE_TYPE_DEFAULTS
+import re
+from utils.constants import UPDATE_TYPES, UPDATE_TYPES_DICT
 from controllers.trade_controller import TradeController
 from services.results import BroadcastResult
 
@@ -57,8 +58,7 @@ class UpdateForm(ctk.CTkToplevel):
         self.dynamic_frame.grid(row=3, column=0, sticky="nsew", padx=40)
         self.dynamic_frame.grid_columnconfigure(1, weight=1)
 
-        self.new_value_label = ctk.CTkLabel(self.dynamic_frame, text="")
-        self.new_value_entry = ctk.CTkEntry(self.dynamic_frame, placeholder_text="0.00")
+        self.dynamic_inputs = {}
 
         ctk.CTkLabel(self, text="Remarks / Details for Message:").grid(
             row=4, column=0, sticky="w", padx=40, pady=(20, 5)
@@ -82,34 +82,46 @@ class UpdateForm(ctk.CTkToplevel):
         self.on_update_type_change(self.update_type_var.get())
 
     def on_update_type_change(self, update_type):
-        self.new_value_label.grid_forget()
-        self.new_value_entry.grid_forget()
-        self.new_value_entry.delete(0, "end")
+        for widget in self.dynamic_frame.winfo_children():
+            widget.destroy()
+        self.dynamic_inputs = {}
 
-        if update_type in ["TRAIL_SL", "MODIFY_SL"]:
-            self.new_value_label.configure(text="New Stop Loss:")
-            self.new_value_label.grid(row=0, column=0, sticky="w", pady=10)
-            self.new_value_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), pady=10)
-        elif update_type == "MODIFY_TARGET":
-            self.new_value_label.configure(text="New Target:")
-            self.new_value_label.grid(row=0, column=0, sticky="w", pady=10)
-            self.new_value_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), pady=10)
-        elif update_type in ["EXIT", "PARTIAL_PROFIT"]:
-            self.new_value_label.configure(text="Exit/Booked Price:")
-            self.new_value_label.grid(row=0, column=0, sticky="w", pady=10)
-            self.new_value_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), pady=10)
+        message_template = UPDATE_TYPES_DICT.get(update_type, {}).get("message", "")
+        
+        fields = re.findall(r"<(.*?)>", message_template)
+        
+        for i, field in enumerate(fields):
+            lbl = ctk.CTkLabel(self.dynamic_frame, text=f"{field}:")
+            lbl.grid(row=i, column=0, sticky="w", pady=10)
+            entry = ctk.CTkEntry(self.dynamic_frame, placeholder_text="0.00")
+            entry.grid(row=i, column=1, sticky="ew", padx=(10, 0), pady=10)
+            
+            def make_trace(current_template):
+                def trace_cb(event=None):
+                    msg = current_template
+                    for f_name, f_entry in self.dynamic_inputs.items():
+                        val = f_entry.get().strip()
+                        if not val:
+                            val = f"<{f_name}>"
+                        msg = msg.replace(f"<{f_name}>", val)
+                    self.remarks_entry.delete("1.0", "end")
+                    self.remarks_entry.insert("1.0", msg)
+                return trace_cb
+            
+            entry.bind("<KeyRelease>", make_trace(message_template))
+            self.dynamic_inputs[field] = entry
 
         self.remarks_entry.delete("1.0", "end")
-        self.remarks_entry.insert("1.0", UPDATE_TYPE_DEFAULTS.get(update_type, ""))
+        self.remarks_entry.insert("1.0", message_template)
 
     def submit_update(self):
         update_type = self.update_type_var.get()
         remarks = self.remarks_entry.get("1.0", "end-1c").strip()
-        new_val_str = self.new_value_entry.get().strip()
+        dynamic_values = {k: v.get().strip() for k, v in self.dynamic_inputs.items()}
 
         try:
             trade_updates, old_value, new_value, update_data_dict = compute_update_fields(
-                self.trade, update_type, new_val_str, remarks
+                self.trade, update_type, dynamic_values, remarks
             )
         except ValueError as e:
             messagebox.showerror("Validation Error", str(e))

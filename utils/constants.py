@@ -30,22 +30,20 @@ STATUSES: list[str] = get_constant(
 )
 
 # ── Update Types ──────────────────────────────────────────
-_UPDATE_TYPE_DEFAULTS_FALLBACK = {
-    "TARGET_HIT": "Target Achieved! Book Profits.",
-    "SL_HIT": "Stop Loss Hit. Exit trade.",
-    "COST_TO_COST": "Trail SL to Cost. Hold rest.",
-    "PARTIAL_PROFIT": "Book partial profits here. Trail SL for rest.",
-    "TRAIL_SL": "Update Stop Loss to protect profits.",
-    "EXIT": "Exit position at CMP.",
-    "MODIFY_TARGET": "",
-    "MODIFY_SL": "",
+_UPDATE_TYPES_FALLBACK = {
+    "TARGET_HIT": {"close_trade": True, "message": "Target Achieved! Book Profits at <Exit Price>."},
+    "SL_HIT": {"close_trade": True, "message": "Stop Loss Hit at <Exit Price>. Exit trade."},
+    "PARTIAL_PROFIT": {"close_trade": False, "message": "Book partial profits at <Booked Price>. Trail SL for rest to <New SL>."},
+    "TRAIL_SL": {"close_trade": False, "message": "Update Stop Loss to <New Stop Loss> to protect profits."},
+    "COST_TO_COST": {"close_trade": False, "message": "Trail SL to Cost at <Cost Price>. Hold rest."},
+    "EXIT": {"close_trade": True, "message": "Exit position at <Exit Price>."},
+    "MODIFY_TARGET": {"close_trade": False, "message": "Modify Target to <New Target>."},
+    "MODIFY_SL": {"close_trade": False, "message": "Modify Stop Loss to <New Stop Loss>."},
 }
-UPDATE_TYPE_DEFAULTS: dict[str, str] = get_constant(
-    "update_type_defaults", _UPDATE_TYPE_DEFAULTS_FALLBACK,
+UPDATE_TYPES_DICT: dict[str, dict] = get_constant(
+    "update_types", _UPDATE_TYPES_FALLBACK,
 )
-UPDATE_TYPES: list[str] = get_constant(
-    "update_types", list(UPDATE_TYPE_DEFAULTS.keys()),
-)
+UPDATE_TYPES: list[str] = list(UPDATE_TYPES_DICT.keys())
 
 # ── Exchange Map ──────────────────────────────────────────
 EXCHANGE_MAP: dict[str, str] = get_constant("exchange_map", {
