@@ -1,5 +1,5 @@
 from core.paths import DATA_DIR, TRADES_PATH
-from database.db_helpers import _ensure_data_dir, _load_wb, _save_workbook, _next_id, _wb_to_dicts
+from database.db_helpers import _ensure_data_dir, _load_wb, _save_workbook, _wb_to_dicts
 from utils.column_mapper import DEFAULT_HEADERS, map_row_to_trade, map_trade_to_columns
 from utils.logger import setup_logger
 from openpyxl import load_workbook
@@ -15,7 +15,7 @@ def get_trades_headers():
     return TRADES_HEADERS
 
 
-def insert_trade(trade_data: dict) -> tuple[int, dict]:
+def insert_trade(trade_data: dict) -> tuple[str, dict]:
     try:
         _ensure_data_dir()
         try:
@@ -30,32 +30,31 @@ def insert_trade(trade_data: dict) -> tuple[int, dict]:
         all_rows = _wb_to_dicts(ws, headers, is_trades=True)
         existing_codes = {r.get("trade_code") for r in all_rows}
         trade_code = _unique_trade_code(existing_codes)
-        trade_id = _next_id(ws)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        enriched = {**trade_data, "id": trade_id, "trade_code": trade_code, "created_at": now, "updated_at": now}
+        enriched = {**trade_data, "trade_code": trade_code, "created_at": now, "updated_at": now}
 
         row = map_trade_to_columns(enriched, headers, is_google_sheets=False)
         ws.append(row)
         _save_workbook(wb, TRADES_PATH)
 
-        logger.info(f"Inserted trade ID {trade_id} code {trade_code} ({enriched.get('stock_name')})")
-        return trade_id, enriched
+        logger.info(f"Inserted trade code {trade_code} ({enriched.get('stock_name')})")
+        return trade_code, enriched
     except Exception as e:
         logger.error(f"Error inserting trade: {e}", exc_info=True)
         raise
 
 
-def get_trade(trade_id: int) -> dict | None:
+def get_trade(trade_code: str) -> dict | None:
     try:
         wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
         ws = wb.active
         for row in _wb_to_dicts(ws, TRADES_HEADERS, is_trades=True):
-            if row.get("id") == trade_id:
+            if row.get("trade_code") == trade_code:
                 return row
         return None
     except Exception as e:
-        logger.error(f"Error fetching trade ID {trade_id}: {e}", exc_info=True)
+        logger.error(f"Error fetching trade code {trade_code}: {e}", exc_info=True)
         return None
 
 
@@ -81,11 +80,11 @@ def get_all_trades(filters: dict | None = None) -> list[dict]:
         return []
 
 
-def update_trade(trade_id: int, fields: dict) -> bool:
+def update_trade(trade_code: str, fields: dict) -> bool:
     try:
-        trade_data = get_trade(trade_id)
+        trade_data = get_trade(trade_code)
         if not trade_data:
-            logger.warning(f"Trade ID {trade_id} not found for update.")
+            logger.warning(f"Trade code {trade_code} not found for update.")
             return False
 
         trade_data.update(fields)
@@ -103,7 +102,7 @@ def update_trade(trade_id: int, fields: dict) -> bool:
 
         updated = False
         for row in ws.iter_rows(min_row=2):
-            if row[0].value == trade_id:
+            if row[0].value == trade_code:
                 for col_idx, val in enumerate(row_arr, start=1):
                     ws.cell(row=row[0].row, column=col_idx, value=val)
                 updated = True
@@ -111,10 +110,10 @@ def update_trade(trade_id: int, fields: dict) -> bool:
 
         if updated:
             _save_workbook(wb, TRADES_PATH)
-            logger.info(f"Updated trade ID {trade_id} with {fields}")
+            logger.info(f"Updated trade code {trade_code} with {fields}")
         return updated
     except Exception as e:
-        logger.error(f"Error updating trade ID {trade_id}: {e}", exc_info=True)
+        logger.error(f"Error updating trade code {trade_code}: {e}", exc_info=True)
         return False
 
 

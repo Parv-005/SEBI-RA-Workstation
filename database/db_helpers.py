@@ -25,13 +25,7 @@ def _save_workbook(wb, path):
     wb.save(path)
 
 
-def _next_id(ws) -> int:
-    max_id = 0
-    for row in ws.iter_rows(min_row=2, max_col=1, values_only=True):
-        val = row[0]
-        if isinstance(val, int) and val > max_id:
-            max_id = val
-    return max_id + 1
+
 
 
 def _wb_to_dicts(ws, headers=None, is_trades=True):

@@ -1,15 +1,12 @@
+# pyrefly: ignore [missing-import]
 import customtkinter as ctk
 import tkinter.messagebox as messagebox
 from datetime import datetime
 from database.db_manager import update_trade, insert_trade_update
 from utils.logger import setup_logger
 import threading
-from services.trade_service import (
-    calculate_risk_reward,
-    compute_update_fields,
-    UPDATE_TYPES,
-    UPDATE_TYPE_DEFAULTS,
-)
+from services.trade_service import compute_update_fields
+from utils.constants import UPDATE_TYPES, UPDATE_TYPE_DEFAULTS
 from controllers.trade_controller import TradeController
 from services.results import BroadcastResult
 
@@ -124,7 +121,7 @@ class UpdateForm(ctk.CTkToplevel):
 
             insert_trade_update(
                 {
-                    "trade_id": self.trade.get("id"),
+                    "trade_code": self.trade.get("trade_code"),
                     "update_type": update_type,
                     "details": remarks,
                     "old_value": old_value,
@@ -133,7 +130,7 @@ class UpdateForm(ctk.CTkToplevel):
             )
 
             if trade_updates:
-                update_trade(self.trade.get("id"), trade_updates)
+                update_trade(self.trade.get("trade_code"), trade_updates)
 
             update_data_dict["_trade_updates"] = trade_updates
 
@@ -153,13 +150,15 @@ class UpdateForm(ctk.CTkToplevel):
 
         if result.sheets_success == "not_configured":
             errors.append("Google Sheets: Not configured")
-        elif not result.sheets_success:
-            errors.append("Google Sheets: Failed")
+        elif result.sheets_success is not True:
+            err_msg = result.sheets_success if isinstance(result.sheets_success, str) else "Failed"
+            errors.append(f"Google Sheets: {err_msg}")
 
         if result.telegram_success == "not_configured":
             errors.append("Telegram: Not configured")
-        elif not result.telegram_success:
-            errors.append("Telegram: Failed")
+        elif result.telegram_success is not True:
+            err_msg = result.telegram_success if isinstance(result.telegram_success, str) else "Failed"
+            errors.append(f"Telegram: {err_msg}")
 
         if not errors:
             messagebox.showinfo("Success", "Update saved and broadcasted successfully!")

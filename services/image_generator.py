@@ -83,7 +83,7 @@ class ImageGenerator:
                 if pos and text:
                     draw.text(tuple(pos), str(text), fill=self.font_color, font=font)
 
-            filename = f"trade_{trade.get('id', 'new')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            filename = f"trade_{trade.get('trade_code', 'new')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             output_path = str(OUTPUT_DIR / filename)
             img.save(output_path)
             logger.info(f"Generated trade image: {output_path}")
@@ -119,7 +119,7 @@ class ImageGenerator:
             if update.get("details"):
                 draw.text((100, 450), update["details"], fill=self.font_color, font=font)
 
-            filename = f"update_{trade.get('id', '')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            filename = f"update_{trade.get('trade_code', '')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             output_path = str(OUTPUT_DIR / filename)
             img.save(output_path)
             logger.info(f"Generated update image: {output_path}")

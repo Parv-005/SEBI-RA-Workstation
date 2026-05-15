@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 
+# pyrefly: ignore [missing-import]
 import gspread
+# pyrefly: ignore [missing-import]
 from google.oauth2.service_account import Credentials
 from core.paths import CONFIG_PATH
 from services.results import AppendResult
@@ -102,7 +104,7 @@ class GoogleSheetsService:
         return result
 
     def update_trade_row(
-        self, trade_id: int, update_data: dict, trade_updates: dict = None
+        self, trade_code: str, update_data: dict, trade_updates: dict = None
     ) -> dict:
         result = {"success": False, "updated_keys": [], "error": None}
         try:
@@ -111,26 +113,26 @@ class GoogleSheetsService:
 
             headers = self.sheet.row_values(1)
             try:
-                db_id_col = headers.index("DB ID") + 1
+                db_id_col = headers.index("Trade Code") + 1
             except ValueError:
-                db_id_col = 2
+                db_id_col = 1
 
             try:
-                cell = self.sheet.find(str(trade_id), in_column=db_id_col)
+                cell = self.sheet.find(str(trade_code), in_column=db_id_col)
             except gspread.CellNotFound:
                 cell = None
 
             if not cell:
                 try:
-                    cell = self.sheet.find(str(trade_id), in_column=1)
+                    cell = self.sheet.find(str(trade_code), in_column=1)
                 except gspread.CellNotFound:
                     pass
 
             if not cell:
                 logger.warning(
-                    f"Trade ID {trade_id} not found in Google Sheets for update."
+                    f"Trade code {trade_code} not found in Google Sheets for update."
                 )
-                result["error"] = f"Trade ID {trade_id} not found"
+                result["error"] = f"Trade code {trade_code} not found"
                 return result
 
             row_num = cell.row
@@ -177,7 +179,7 @@ class GoogleSheetsService:
                     except ValueError:
                         continue
 
-            logger.info(f"Updated trade {trade_id} row in Google Sheets.")
+            logger.info(f"Updated trade {trade_code} row in Google Sheets.")
             result["success"] = True
         except Exception as e:
             logger.error(

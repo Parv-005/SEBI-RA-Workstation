@@ -1,19 +1,11 @@
+# pyrefly: ignore [missing-import]
 import customtkinter as ctk
 from database.db_manager import get_all_trades
-from utils.constants_loader import get_constant
+from utils.constants import STATUS_COLORS, STATUSES, ACTION_COLORS
 from services.trade_service import to_display_action
 from utils.logger import setup_logger
 
 logger = setup_logger("TradeList")
-
-STATUS_COLORS = get_constant("status_colors", {
-    "ACTIVE": "#17a2b8",
-    "TARGET_HIT": "#28a745",
-    "SL_HIT": "#dc3545",
-    "EXITED": "gray",
-})
-
-STATUSES = list(STATUS_COLORS.keys()) + ["ALL"]
 
 
 class TradeList(ctk.CTkFrame):
@@ -81,9 +73,9 @@ class TradeList(ctk.CTkFrame):
 
         for i, trade in enumerate(trades):
             date_str = str(trade.get('created_at', '—')).split(' ')[0] if trade.get('created_at') else "—"
-            trade_code = trade.get('trade_code') or str(trade.get('id', '?'))
+            trade_code = trade.get('trade_code', '?')
             action_display = to_display_action(trade.get('action', 'LONG'))
-            action_color = "#28a745" if trade.get('action') == "BUY" else "#dc3545"
+            action_color = ACTION_COLORS["LONG"] if trade.get('action') == "BUY" else ACTION_COLORS["SHORT"]
 
             row_bg = ("gray95", "gray17") if i % 2 == 0 else ("gray90", "gray20")
 

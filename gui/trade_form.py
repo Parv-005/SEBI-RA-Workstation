@@ -4,8 +4,8 @@ import tkinter.messagebox as messagebox
 import threading
 from database.db_manager import insert_trade
 from utils.logger import setup_logger
-from utils.constants_loader import get_constant
-from services.trade_service import calculate_risk_reward, to_db_action, UPDATE_TYPE_DEFAULTS
+from utils.constants import SEGMENTS, ACTION_DISPLAY, TRADE_TYPES, ACTION_COLORS
+from services.trade_service import calculate_risk_reward, to_db_action
 from services.results import BroadcastResult
 from controllers.trade_controller import TradeController
 
@@ -32,10 +32,6 @@ def _field_label(parent, text, row, col, pady_top=12):
     lbl = ctk.CTkLabel(parent, text=text, anchor="w")
     lbl.grid(row=row, column=col, padx=(14, 4), pady=(pady_top, 0), sticky="w")
     return lbl
-
-
-SEGMENTS = get_constant("segments", ["Cash", "F&O", "MCX", "Currency", "Index"])
-DISPLAY_ACTIONS = get_constant("actions", {}).get("display", ["LONG", "SHORT"])
 
 
 class TradeForm(ctk.CTkFrame):
@@ -73,14 +69,14 @@ class TradeForm(ctk.CTkFrame):
         self.segment_menu.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
 
         _field_label(ff, "Action:", r, 2)
-        self.action_var = ctk.StringVar(value=DISPLAY_ACTIONS[0] if DISPLAY_ACTIONS else "LONG")
+        self.action_var = ctk.StringVar(value=ACTION_DISPLAY[0] if ACTION_DISPLAY else "LONG")
         self.action_menu = ctk.CTkOptionMenu(
             ff,
             variable=self.action_var,
-            values=DISPLAY_ACTIONS if DISPLAY_ACTIONS else ["LONG", "SHORT"],
-            fg_color="#28a745",
-            button_color="#218838",
-            button_hover_color="#1e7e34",
+            values=ACTION_DISPLAY if ACTION_DISPLAY else ["LONG", "SHORT"],
+            fg_color=ACTION_COLORS["LONG"],
+            button_color=ACTION_COLORS["LONG_HOVER"],
+            button_hover_color=ACTION_COLORS["LONG_HOVER2"],
         )
         self.action_menu.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
@@ -93,14 +89,11 @@ class TradeForm(ctk.CTkFrame):
         r += 1
 
         _field_label(ff, "Trade Type:", r, 0)
-        trade_types = get_constant(
-            "trade_types", ["Intraday", "BTST", "Positional", "Short-term", "Long-term"]
-        )
         self.trade_type_var = ctk.StringVar(
-            value=trade_types[0] if trade_types else "Intraday"
+            value=TRADE_TYPES[0] if TRADE_TYPES else "Intraday"
         )
         self.trade_type_menu = ctk.CTkOptionMenu(
-            ff, variable=self.trade_type_var, values=trade_types
+            ff, variable=self.trade_type_var, values=TRADE_TYPES
         )
         self.trade_type_menu.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
 
@@ -218,11 +211,13 @@ class TradeForm(ctk.CTkFrame):
     def update_action_color(self, *args):
         if self.action_var.get() == "LONG":
             self.action_menu.configure(
-                fg_color="#28a745", button_color="#218838", button_hover_color="#1e7e34"
+                fg_color=ACTION_COLORS["LONG"], button_color=ACTION_COLORS["LONG_HOVER"],
+                button_hover_color=ACTION_COLORS["LONG_HOVER2"],
             )
         else:
             self.action_menu.configure(
-                fg_color="#dc3545", button_color="#c82333", button_hover_color="#bd2130"
+                fg_color=ACTION_COLORS["SHORT"], button_color=ACTION_COLORS["SHORT_HOVER"],
+                button_hover_color=ACTION_COLORS["SHORT_HOVER2"],
             )
 
     def _auto_calc_rr(self, *args):
@@ -402,13 +397,15 @@ class TradeForm(ctk.CTkFrame):
 
         if result.sheets_success == "not_configured":
             errors.append("Google Sheets: Not configured")
-        elif not result.sheets_success:
-            errors.append("Google Sheets: Failed")
+        elif result.sheets_success is not True:
+            err_msg = result.sheets_success if isinstance(result.sheets_success, str) else "Failed"
+            errors.append(f"Google Sheets: {err_msg}")
 
         if result.telegram_success == "not_configured":
             errors.append("Telegram: Not configured")
-        elif not result.telegram_success:
-            errors.append("Telegram: Failed")
+        elif result.telegram_success is not True:
+            err_msg = result.telegram_success if isinstance(result.telegram_success, str) else "Failed"
+            errors.append(f"Telegram: {err_msg}")
 
         if result.sheets_unmapped:
             messagebox.showwarning(

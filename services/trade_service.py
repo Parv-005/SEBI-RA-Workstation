@@ -1,25 +1,8 @@
 from dataclasses import dataclass
-from utils.constants_loader import get_constant
+from utils.constants import ACTION_DISPLAY_MAP, ACTION_DB_MAP, UPDATE_TYPE_DEFAULTS, UPDATE_TYPES
 from utils.logger import setup_logger
 
 logger = setup_logger("TradeService")
-
-_actions_config = get_constant("actions", {})
-ACTION_DISPLAY_MAP = _actions_config.get("display_to_db", {"LONG": "BUY", "SHORT": "SELL"})
-DISPLAY_ACTION_MAP = _actions_config.get("db_to_display", {"BUY": "LONG", "SELL": "SHORT"})
-
-UPDATE_TYPE_DEFAULTS = get_constant("update_type_defaults", {
-    "TARGET_HIT": "Target Achieved! Book Profits.",
-    "SL_HIT": "Stop Loss Hit. Exit trade.",
-    "COST_TO_COST": "Trail SL to Cost. Hold rest.",
-    "PARTIAL_PROFIT": "Book partial profits here. Trail SL for rest.",
-    "TRAIL_SL": "Update Stop Loss to protect profits.",
-    "EXIT": "Exit position at CMP.",
-    "MODIFY_TARGET": "",
-    "MODIFY_SL": "",
-})
-
-UPDATE_TYPES = get_constant("update_types", list(UPDATE_TYPE_DEFAULTS.keys()))
 
 
 @dataclass
@@ -64,7 +47,7 @@ def to_db_action(display_action: str) -> str:
 
 
 def to_display_action(db_action: str) -> str:
-    return DISPLAY_ACTION_MAP.get(db_action, db_action)
+    return ACTION_DB_MAP.get(db_action, db_action)
 
 
 def compute_update_fields(

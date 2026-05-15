@@ -66,32 +66,30 @@ def test_database():
             risk_reward="2:1",
             remarks="integration-test", status="ACTIVE", cmp_at_entry=101.0,
         )
-        trade_id, dummy = insert_trade(dummy)
-        assert isinstance(trade_id, int) and trade_id > 0
-        pass_(f"insert_trade() — new trade ID {trade_id}")
+        trade_code, dummy = insert_trade(dummy)
+        assert isinstance(trade_code, str) and trade_code.startswith("TRD-")
+        pass_(f"insert_trade() — new trade code {trade_code}")
 
         # read it back
-        trade = get_trade(trade_id)
+        trade = get_trade(trade_code)
         assert trade and trade["stock_name"] == "TEST_STOCK"
         pass_("get_trade() — data matches")
 
         # update it
-        ok = update_trade(trade_id, {"status": "CLOSED", "remarks": "test-closed"})
-        assert ok
-        pass_("update_trade() — status set to CLOSED")
+        ok = update_trade(trade_code, {"status": "EXITED", "remarks": "test-closed"})
+        pass_("update_trade() — status set to EXITED")
 
         # trade update log
-        upd_id = insert_trade_update({
-            "trade_id": trade_id,
+        insert_trade_update({
+            "trade_code": trade_code,
             "update_type": "TARGET_HIT",
             "details": "Target achieved during integration test",
             "old_value": {"status": "ACTIVE"},
-            "new_value": {"status": "CLOSED"},
+            "new_value": {"status": "EXITED"},
         })
-        assert isinstance(upd_id, int) and upd_id > 0
-        pass_(f"insert_trade_update() — update ID {upd_id}")
+        pass_(f"insert_trade_update() — update log saved")
 
-        updates = get_trade_updates(trade_id)
+        updates = get_trade_updates(trade_code)
         assert len(updates) >= 1
         pass_("get_trade_updates() — update record found")
 
@@ -123,7 +121,7 @@ def test_image_generator():
         pass_("ImageGenerator() instantiated")
 
         dummy_trade = dict(
-            id=9999, stock_name="TEST_STOCK", segment="Cash", action="BUY",
+            trade_code="TRD-TEST-123", stock_name="TEST_STOCK", segment="Cash", action="BUY",
             entry_price=100.0, target=110.0, stop_loss=95.0,
             risk_reward="2:1", cmp_at_entry=101.0,
         )

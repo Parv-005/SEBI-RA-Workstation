@@ -86,9 +86,14 @@ class TradeController:
             if gs.is_configured():
                 trade_updates = update_data.get("_trade_updates", {})
                 gs_result = gs.update_trade_row(
-                    trade["id"], update_data, trade_updates
+                    trade["trade_code"], update_data, trade_updates
                 )
-                result.sheets_success = True if gs_result.get("success") else gs_result.get("error", "Failed")
+                if gs_result.get("success"):
+                    result.sheets_success = True
+                else:
+                    err_msg = gs_result.get("error", "Failed")
+                    result.sheets_success = err_msg
+                    result.errors.append(f"Google Sheets: {err_msg}")
             else:
                 result.sheets_success = "not_configured"
         except Exception as e:
