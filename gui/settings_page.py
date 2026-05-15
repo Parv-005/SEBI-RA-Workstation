@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import customtkinter as ctk
 import tkinter.messagebox as messagebox
 import tkinter.filedialog as filedialog
@@ -29,17 +30,20 @@ class SettingsPage(ctk.CTkFrame):
         self.tg_phone = self._add_entry("Phone Number (+91...):", tg.get("phone", ""), row=3)
         self.tg_group = self._add_entry("Group/Channel ID:", tg.get("group_id", ""), row=4)
 
-        self._add_section_header("Google Sheets Integration", row=5)
-        gs = self.config.get("google_sheets", {})
-        self.gs_json = self._add_entry_with_browse("Service Account JSON path:", gs.get("service_account_json", ""), row=6)
-        self.gs_sheet_id = self._add_entry("Spreadsheet ID:", gs.get("spreadsheet_id", ""), row=7)
+        self.tg_auth_btn = ctk.CTkButton(self.scroll_frame, text="Authenticate Telegram", command=self._auth_telegram)
+        self.tg_auth_btn.grid(row=5, column=0, columnspan=2, pady=(10, 20))
 
-        self._add_section_header("AngelOne SmartAPI", row=8)
+        self._add_section_header("Google Sheets Integration", row=6)
+        gs = self.config.get("google_sheets", {})
+        self.gs_json = self._add_entry_with_browse("Service Account JSON path:", gs.get("service_account_json", ""), row=7)
+        self.gs_sheet_id = self._add_entry("Spreadsheet ID:", gs.get("spreadsheet_id", ""), row=8)
+
+        self._add_section_header("AngelOne SmartAPI", row=9)
         ao = self.config.get("angelone", {})
-        self.ao_api_key = self._add_entry("API Key:", ao.get("api_key", ""), row=9)
-        self.ao_client_id = self._add_entry("Client ID:", ao.get("client_id", ""), row=10)
-        self.ao_password = self._add_entry("Password (PIN):", ao.get("password", ""), row=11)
-        self.ao_totp = self._add_entry("TOTP Secret:", ao.get("totp_secret", ""), row=12)
+        self.ao_api_key = self._add_entry("API Key:", ao.get("api_key", ""), row=10)
+        self.ao_client_id = self._add_entry("Client ID:", ao.get("client_id", ""), row=11)
+        self.ao_password = self._add_entry("Password (PIN):", ao.get("password", ""), row=12)
+        self.ao_totp = self._add_entry("TOTP Secret:", ao.get("totp_secret", ""), row=13)
 
         self.save_btn = ctk.CTkButton(self, text="Save Settings", font=ctk.CTkFont(weight="bold"), command=self._save_settings)
         self.save_btn.grid(row=2, column=0, pady=20)
@@ -107,5 +111,74 @@ class SettingsPage(ctk.CTkFrame):
 
         if save_config(config):
             messagebox.showinfo("Success", "Settings saved successfully!\nRestart app or re-connect services if required.")
+            return True
         else:
             messagebox.showerror("Error", "Failed to save settings.")
+            return False
+
+    def _ask_user_sync(self, prompt, title):
+        import threading
+        result = [None]
+        event = threading.Event()
+        
+        def _ask():
+            dialog = ctk.CTkInputDialog(text=prompt, title=title)
+            result[0] = dialog.get_input()
+            event.set()
+            
+        self.after(0, _ask)
+        event.wait()
+        return result[0]
+
+    def _auth_telegram(self):
+        if not self._save_settings():
+            return
+            
+        self.tg_auth_btn.configure(text="Authenticating...", state="disabled")
+        
+        import threading
+        def auth_flow():
+            from services.telegram_service import TelegramService
+            import asyncio
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            tg = TelegramService()
+            
+            async def flow():
+                try:
+                    authorized = await tg.connect()
+                    if authorized:
+                        self.after(0, lambda: messagebox.showinfo("Telegram", "Already authorized! No OTP needed."))
+                        await tg.disconnect()
+                        return
+                        
+                    code = self._ask_user_sync("Enter Telegram OTP:", "Telegram Auth")
+                    if not code:
+                        await tg.disconnect()
+                        return
+                        
+                    try:
+                        await tg.sign_in(code)
+                        self.after(0, lambda: messagebox.showinfo("Telegram", "Authorized successfully!"))
+                    except Exception as e:
+                        if "Two-step verification" in str(e):
+                            pwd = self._ask_user_sync("Enter 2FA Password:", "Telegram Auth")
+                            if not pwd:
+                                await tg.disconnect()
+                                return
+                            await tg.sign_in(code, pwd)
+                            self.after(0, lambda: messagebox.showinfo("Telegram", "Authorized successfully!"))
+                        else:
+                            raise e
+                    finally:
+                        await tg.disconnect()
+                except Exception as e:
+                    self.after(0, lambda e=e: messagebox.showerror("Telegram Error", f"Failed: {e}"))
+                finally:
+                    self.after(0, lambda: self.tg_auth_btn.configure(text="Authenticate Telegram", state="normal"))
+            
+            loop.run_until_complete(flow())
+            loop.close()
+            
+        threading.Thread(target=auth_flow, daemon=True).start()
