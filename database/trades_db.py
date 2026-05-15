@@ -1,0 +1,132 @@
+from core.paths import DATA_DIR, TRADES_PATH
+from database.db_helpers import _ensure_data_dir, _load_wb, _save_workbook, _next_id, _wb_to_dicts
+from utils.column_mapper import DEFAULT_HEADERS, map_row_to_trade, map_trade_to_columns
+from utils.logger import setup_logger
+from openpyxl import load_workbook
+from datetime import datetime
+import uuid
+
+logger = setup_logger("TradesDB")
+
+TRADES_HEADERS = DEFAULT_HEADERS()
+
+
+def get_trades_headers():
+    return TRADES_HEADERS
+
+
+def insert_trade(trade_data: dict) -> tuple[int, dict]:
+    try:
+        _ensure_data_dir()
+        try:
+            wb = load_workbook(TRADES_PATH)
+            ws = wb.active
+            headers = [c.value for c in ws[1]]
+        except Exception:
+            wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
+            ws = wb.active
+            headers = TRADES_HEADERS
+
+        all_rows = _wb_to_dicts(ws, headers, is_trades=True)
+        existing_codes = {r.get("trade_code") for r in all_rows}
+        trade_code = _unique_trade_code(existing_codes)
+        trade_id = _next_id(ws)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        enriched = {**trade_data, "id": trade_id, "trade_code": trade_code, "created_at": now, "updated_at": now}
+
+        row = map_trade_to_columns(enriched, headers, is_google_sheets=False)
+        ws.append(row)
+        _save_workbook(wb, TRADES_PATH)
+
+        logger.info(f"Inserted trade ID {trade_id} code {trade_code} ({enriched.get('stock_name')})")
+        return trade_id, enriched
+    except Exception as e:
+        logger.error(f"Error inserting trade: {e}", exc_info=True)
+        raise
+
+
+def get_trade(trade_id: int) -> dict | None:
+    try:
+        wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
+        ws = wb.active
+        for row in _wb_to_dicts(ws, TRADES_HEADERS, is_trades=True):
+            if row.get("id") == trade_id:
+                return row
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching trade ID {trade_id}: {e}", exc_info=True)
+        return None
+
+
+def get_all_trades(filters: dict | None = None) -> list[dict]:
+    try:
+        wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
+        ws = wb.active
+        rows = _wb_to_dicts(ws, TRADES_HEADERS, is_trades=True)
+
+        if filters:
+            if filters.get("status"):
+                rows = [r for r in rows if r.get("status") == filters["status"]]
+            if filters.get("segment"):
+                rows = [r for r in rows if r.get("segment") == filters["segment"]]
+            if filters.get("search"):
+                term = filters["search"].lower()
+                rows = [r for r in rows if term in str(r.get("stock_name", "")).lower()]
+
+        rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+        return rows
+    except Exception as e:
+        logger.error(f"Error fetching all trades: {e}", exc_info=True)
+        return []
+
+
+def update_trade(trade_id: int, fields: dict) -> bool:
+    try:
+        trade_data = get_trade(trade_id)
+        if not trade_data:
+            logger.warning(f"Trade ID {trade_id} not found for update.")
+            return False
+
+        trade_data.update(fields)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        trade_data["updated_at"] = now
+
+        wb = load_workbook(TRADES_PATH)
+        ws = wb.active
+
+        headers = [c.value for c in ws[1]]
+        if not any(headers):
+            headers = TRADES_HEADERS
+
+        row_arr = map_trade_to_columns(trade_data, headers, is_google_sheets=False)
+
+        updated = False
+        for row in ws.iter_rows(min_row=2):
+            if row[0].value == trade_id:
+                for col_idx, val in enumerate(row_arr, start=1):
+                    ws.cell(row=row[0].row, column=col_idx, value=val)
+                updated = True
+                break
+
+        if updated:
+            _save_workbook(wb, TRADES_PATH)
+            logger.info(f"Updated trade ID {trade_id} with {fields}")
+        return updated
+    except Exception as e:
+        logger.error(f"Error updating trade ID {trade_id}: {e}", exc_info=True)
+        return False
+
+
+def generate_trade_code() -> str:
+    date_str = datetime.now().strftime("%Y%m%d")
+    suffix = uuid.uuid4().hex[:6].upper()
+    return f"TRD-{date_str}-{suffix}"
+
+
+def _unique_trade_code(existing_codes: set) -> str:
+    for _ in range(10):
+        code = generate_trade_code()
+        if code not in existing_codes:
+            return code
+    raise RuntimeError("Unable to generate a unique trade code after 10 attempts.")

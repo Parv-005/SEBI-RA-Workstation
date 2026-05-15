@@ -49,6 +49,41 @@ _DEFAULT_CONSTANTS = {
         "SCALPING",
         "LONG TERM",
     ],
+    "segments": ["Cash", "F&O", "MCX", "Currency", "Index"],
+    "actions": {
+        "display": ["LONG", "SHORT"],
+        "db": ["BUY", "SELL"],
+        "display_to_db": {"LONG": "BUY", "SHORT": "SELL"},
+        "db_to_display": {"BUY": "LONG", "SELL": "SHORT"},
+    },
+    "statuses": ["ACTIVE", "TARGET_HIT", "SL_HIT", "EXITED"],
+    "update_types": [
+        "TARGET_HIT", "SL_HIT", "PARTIAL_PROFIT", "TRAIL_SL",
+        "COST_TO_COST", "EXIT", "MODIFY_TARGET", "MODIFY_SL",
+    ],
+    "update_type_defaults": {
+        "TARGET_HIT": "Target Achieved! Book Profits.",
+        "SL_HIT": "Stop Loss Hit. Exit trade.",
+        "COST_TO_COST": "Trail SL to Cost. Hold rest.",
+        "PARTIAL_PROFIT": "Book partial profits here. Trail SL for rest.",
+        "TRAIL_SL": "Update Stop Loss to protect profits.",
+        "EXIT": "Exit position at CMP.",
+        "MODIFY_TARGET": "",
+        "MODIFY_SL": "",
+    },
+    "exchange_map": {
+        "Cash": "NSE",
+        "F&O": "NFO",
+        "MCX": "MCX",
+        "Currency": "CDS",
+        "Index": "NSE",
+    },
+    "status_colors": {
+        "ACTIVE": "#17a2b8",
+        "TARGET_HIT": "#28a745",
+        "SL_HIT": "#dc3545",
+        "EXITED": "gray",
+    },
 }
 
 

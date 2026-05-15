@@ -4,7 +4,10 @@ Spreadsheet/XLSX header columns. Supports dynamic formulas.
 """
 
 from utils.constants_loader import get_constant
+from utils.logger import setup_logger
 from string import ascii_uppercase
+
+logger = setup_logger("ColumnMapper")
 
 _headers_schema = None
 

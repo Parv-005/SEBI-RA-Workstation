@@ -1,21 +1,20 @@
+# pyrefly: ignore [missing-import]
 import customtkinter as ctk
 import tkinter.messagebox as messagebox
 import threading
 from database.db_manager import insert_trade
 from utils.logger import setup_logger
-from utils.async_helper import run_async
 from utils.constants_loader import get_constant
-from utils.message_formatter import format_new_trade
-from services.image_generator import ImageGenerator
-from services.telegram_service import TelegramService
-from services.google_sheets_service import GoogleSheetsService, EmptySheetError
+from services.trade_service import calculate_risk_reward, to_db_action, UPDATE_TYPE_DEFAULTS
+from services.results import BroadcastResult
+from controllers.trade_controller import TradeController
 
 logger = setup_logger("TradeForm")
 
+controller = TradeController()
 
-# ─────────────────── helpers ────────────────────
+
 def _section_label(parent, text, row, col=0, colspan=4, pady_top=20):
-    """A subtle section divider label."""
     lbl = ctk.CTkLabel(
         parent,
         text=f"  {text}",
@@ -24,12 +23,7 @@ def _section_label(parent, text, row, col=0, colspan=4, pady_top=20):
         anchor="w",
     )
     lbl.grid(
-        row=row,
-        column=col,
-        columnspan=colspan,
-        padx=10,
-        pady=(pady_top, 2),
-        sticky="ew",
+        row=row, column=col, columnspan=colspan, padx=10, pady=(pady_top, 2), sticky="ew"
     )
     return lbl
 
@@ -40,7 +34,8 @@ def _field_label(parent, text, row, col, pady_top=12):
     return lbl
 
 
-# ─────────────────── main class ────────────────────
+SEGMENTS = get_constant("segments", ["Cash", "F&O", "MCX", "Currency", "Index"])
+DISPLAY_ACTIONS = get_constant("actions", {}).get("display", ["LONG", "SHORT"])
 
 
 class TradeForm(ctk.CTkFrame):
@@ -49,13 +44,11 @@ class TradeForm(ctk.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
 
-        # ── Title ──────────────────────────────────────────────
         self.title_label = ctk.CTkLabel(
             self, text="New Trade Entry", font=ctk.CTkFont(size=24, weight="bold")
         )
         self.title_label.grid(row=0, column=0, padx=20, pady=(0, 10), sticky="w")
 
-        # ── Scrollable Form ────────────────────────────────────
         self.form_frame = ctk.CTkScrollableFrame(self)
         self.form_frame.grid(row=1, column=0, sticky="nsew")
         self.grid_rowconfigure(1, weight=1)
@@ -66,30 +59,25 @@ class TradeForm(ctk.CTkFrame):
         ff.grid_columnconfigure(2, weight=0, minsize=130)
         ff.grid_columnconfigure(3, weight=1)
 
-        r = 0  # running row counter
+        r = 0
 
-        # ════════════════════════════════════════
         # SECTION: Basic Info
-        # ════════════════════════════════════════
         _section_label(ff, "TRADE IDENTITY", r, pady_top=10)
         r += 1
 
-        # Segment & Action
         _field_label(ff, "Segment:", r, 0)
-        self.segment_var = ctk.StringVar(value="Cash")
+        self.segment_var = ctk.StringVar(value=SEGMENTS[0] if SEGMENTS else "Cash")
         self.segment_menu = ctk.CTkOptionMenu(
-            ff,
-            variable=self.segment_var,
-            values=["Cash", "F&O", "MCX", "Currency", "Index"],
+            ff, variable=self.segment_var, values=SEGMENTS
         )
         self.segment_menu.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
 
         _field_label(ff, "Action:", r, 2)
-        self.action_var = ctk.StringVar(value="LONG")
+        self.action_var = ctk.StringVar(value=DISPLAY_ACTIONS[0] if DISPLAY_ACTIONS else "LONG")
         self.action_menu = ctk.CTkOptionMenu(
             ff,
             variable=self.action_var,
-            values=["LONG", "SHORT"],
+            values=DISPLAY_ACTIONS if DISPLAY_ACTIONS else ["LONG", "SHORT"],
             fg_color="#28a745",
             button_color="#218838",
             button_hover_color="#1e7e34",
@@ -97,23 +85,17 @@ class TradeForm(ctk.CTkFrame):
         self.action_menu.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # Stock Name
         _field_label(ff, "Stock / Symbol:", r, 0)
         self.stock_entry = ctk.CTkEntry(ff, placeholder_text="e.g. RELIANCE, BANKNIFTY")
-        self.stock_entry.grid(
-            row=r, column=1, columnspan=2, padx=8, pady=(12, 0), sticky="ew"
-        )
+        self.stock_entry.grid(row=r, column=1, columnspan=2, padx=8, pady=(12, 0), sticky="ew")
         self.fetch_cmp_btn = ctk.CTkButton(ff, text="Fetch CMP", command=self.fetch_cmp)
         self.fetch_cmp_btn.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # Trade Type
         _field_label(ff, "Trade Type:", r, 0)
-
         trade_types = get_constant(
             "trade_types", ["Intraday", "BTST", "Positional", "Short-term", "Long-term"]
         )
-
         self.trade_type_var = ctk.StringVar(
             value=trade_types[0] if trade_types else "Intraday"
         )
@@ -122,7 +104,6 @@ class TradeForm(ctk.CTkFrame):
         )
         self.trade_type_menu.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
 
-        # Approx Time
         _field_label(ff, "Approx Time:", r, 2)
         self.approx_time_entry = ctk.CTkEntry(
             ff, placeholder_text="e.g. 2-3 days, 1 week"
@@ -130,13 +111,10 @@ class TradeForm(ctk.CTkFrame):
         self.approx_time_entry.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # ════════════════════════════════════════
         # SECTION: Price Levels
-        # ════════════════════════════════════════
         _section_label(ff, "PRICE LEVELS", r)
         r += 1
 
-        # Entry Price & CMP placeholder
         _field_label(ff, "Entry Price:", r, 0)
         self.price_var = ctk.StringVar()
         self.price_entry = ctk.CTkEntry(
@@ -152,7 +130,6 @@ class TradeForm(ctk.CTkFrame):
         self.target_entry.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # Entry Zone
         _field_label(ff, "Zone Start:", r, 0)
         self.zone_start_entry = ctk.CTkEntry(ff, placeholder_text="Lower bound")
         self.zone_start_entry.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
@@ -162,7 +139,6 @@ class TradeForm(ctk.CTkFrame):
         self.zone_end_entry.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # Stop Loss
         _field_label(ff, "Stop Loss:", r, 0)
         self.sl_var = ctk.StringVar()
         self.sl_entry = ctk.CTkEntry(
@@ -171,31 +147,23 @@ class TradeForm(ctk.CTkFrame):
         self.sl_entry.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # ════════════════════════════════════════
         # SECTION: Risk & Reward Analysis
-        # ════════════════════════════════════════
         _section_label(ff, "RISK & REWARD ANALYSIS", r)
         r += 1
 
         _field_label(ff, "Reward:", r, 0)
         self.reward_var = ctk.StringVar(value="0.00")
         self.reward_display = ctk.CTkEntry(
-            ff,
-            textvariable=self.reward_var,
-            state="disabled",
-            fg_color=("gray90", "gray20"),
-            text_color=("gray30", "gray70"),
+            ff, textvariable=self.reward_var, state="disabled",
+            fg_color=("gray90", "gray20"), text_color=("gray30", "gray70"),
         )
         self.reward_display.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
 
         _field_label(ff, "Risk:", r, 2)
         self.risk_var = ctk.StringVar(value="0.00")
         self.risk_display = ctk.CTkEntry(
-            ff,
-            textvariable=self.risk_var,
-            state="disabled",
-            fg_color=("gray90", "gray20"),
-            text_color=("gray30", "gray70"),
+            ff, textvariable=self.risk_var, state="disabled",
+            fg_color=("gray90", "gray20"), text_color=("gray30", "gray70"),
         )
         self.risk_display.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
@@ -203,22 +171,16 @@ class TradeForm(ctk.CTkFrame):
         _field_label(ff, "Reward %:", r, 0)
         self.reward_pct_var = ctk.StringVar(value="0.00%")
         self.reward_pct_display = ctk.CTkEntry(
-            ff,
-            textvariable=self.reward_pct_var,
-            state="disabled",
-            fg_color=("gray90", "gray20"),
-            text_color=("gray30", "gray70"),
+            ff, textvariable=self.reward_pct_var, state="disabled",
+            fg_color=("gray90", "gray20"), text_color=("gray30", "gray70"),
         )
         self.reward_pct_display.grid(row=r, column=1, padx=8, pady=(12, 0), sticky="ew")
 
         _field_label(ff, "Risk %:", r, 2)
         self.risk_pct_var = ctk.StringVar(value="0.00%")
         self.risk_pct_display = ctk.CTkEntry(
-            ff,
-            textvariable=self.risk_pct_var,
-            state="disabled",
-            fg_color=("gray90", "gray20"),
-            text_color=("gray30", "gray70"),
+            ff, textvariable=self.risk_pct_var, state="disabled",
+            fg_color=("gray90", "gray20"), text_color=("gray30", "gray70"),
         )
         self.risk_pct_display.grid(row=r, column=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
@@ -226,49 +188,32 @@ class TradeForm(ctk.CTkFrame):
         _field_label(ff, "Risk : Reward:", r, 0)
         self.rr_var = ctk.StringVar(value="—")
         self.rr_display = ctk.CTkEntry(
-            ff,
-            textvariable=self.rr_var,
-            state="disabled",
-            fg_color=("gray90", "gray20"),
-            text_color=("gray30", "gray70"),
+            ff, textvariable=self.rr_var, state="disabled",
+            fg_color=("gray90", "gray20"), text_color=("gray30", "gray70"),
         )
-        self.rr_display.grid(
-            row=r, column=1, columnspan=3, padx=8, pady=(12, 0), sticky="ew"
-        )
+        self.rr_display.grid(row=r, column=1, columnspan=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # ════════════════════════════════════════
         # SECTION: Notes
-        # ════════════════════════════════════════
         _section_label(ff, "NOTES", r)
         r += 1
 
         _field_label(ff, "Remarks:", r, 0)
         self.remarks_entry = ctk.CTkTextbox(ff, height=80)
-        self.remarks_entry.grid(
-            row=r, column=1, columnspan=3, padx=8, pady=(12, 0), sticky="ew"
-        )
+        self.remarks_entry.grid(row=r, column=1, columnspan=3, padx=8, pady=(12, 0), sticky="ew")
         r += 1
 
-        # ── Submit ──────────────────────────────────────────────
         self.submit_btn = ctk.CTkButton(
-            ff,
-            text="✦  Submit Trade & Broadcast",
+            ff, text="✦  Submit Trade & Broadcast",
             font=ctk.CTkFont(size=16, weight="bold"),
-            height=52,
-            command=self.submit_trade,
+            height=52, command=self.submit_trade,
         )
-        self.submit_btn.grid(
-            row=r, column=0, columnspan=4, padx=10, pady=(32, 24), sticky="ew"
-        )
+        self.submit_btn.grid(row=r, column=0, columnspan=4, padx=10, pady=(32, 24), sticky="ew")
 
-        # ── Wire up events ──────────────────────────────────────
         self.action_var.trace_add("write", self.update_action_color)
         self.price_var.trace_add("write", self._auto_calc_rr)
         self.target_var.trace_add("write", self._auto_calc_rr)
         self.sl_var.trace_add("write", self._auto_calc_rr)
-
-    # ─────────────────── UI helpers ────────────────────
 
     def update_action_color(self, *args):
         if self.action_var.get() == "LONG":
@@ -281,43 +226,30 @@ class TradeForm(ctk.CTkFrame):
             )
 
     def _auto_calc_rr(self, *args):
-        """Auto-calculate and display the Risk:Reward ratio."""
         try:
             entry = float(self.price_var.get())
             target = float(self.target_var.get())
             sl = float(self.sl_var.get())
+            action = self.action_var.get()
 
-            if self.action_var.get() == "LONG":
-                reward = target - entry
-                risk = entry - sl
-            else:  # SHORT
-                reward = entry - target
-                risk = sl - entry
-
-            self.reward_var.set(f"{reward:.2f}")
-            self.risk_var.set(f"{risk:.2f}")
+            result = calculate_risk_reward(action, entry, target, sl)
+            self.reward_var.set(f"{result.reward:.2f}")
+            self.risk_var.set(f"{result.risk:.2f}")
 
             if entry > 0:
-                self.reward_pct_var.set(f"{(reward / entry) * 100:.2f}%")
-                self.risk_pct_var.set(f"{(risk / entry) * 100:.2f}%")
+                self.reward_pct_var.set(f"{result.reward_pct:.2f}%")
+                self.risk_pct_var.set(f"{result.risk_pct:.2f}%")
             else:
                 self.reward_pct_var.set("0.00%")
                 self.risk_pct_var.set("0.00%")
 
-            if risk <= 0 or reward < 0:
-                self.rr_var.set("—")
-                return
-
-            ratio = reward / risk
-            self.rr_var.set(f"1 : {ratio:.2f}")
+            self.rr_var.set(result.risk_reward if result.risk_reward else "—")
         except (ValueError, ZeroDivisionError):
             self.rr_var.set("—")
             self.reward_var.set("0.00")
             self.risk_var.set("0.00")
             self.reward_pct_var.set("0.00%")
             self.risk_pct_var.set("0.00%")
-
-    # ─────────────────── Fetch CMP ────────────────────
 
     def fetch_cmp(self):
         symbol = self.stock_entry.get().strip().upper()
@@ -370,22 +302,16 @@ class TradeForm(ctk.CTkFrame):
                 exchange = best_match.get("exch_seg")
                 actual_symbol = best_match.get("tradingsymbol")
 
-                self.after(
-                    0, lambda: self.fetch_cmp_btn.configure(text="Fetching LTP...")
-                )
+                self.after(0, lambda: self.fetch_cmp_btn.configure(text="Fetching LTP..."))
 
                 ltp = ao.get_ltp(actual_symbol, exchange, token)
 
                 if ltp is not None:
-
                     def update_ui():
                         self.stock_entry.delete(0, "end")
                         self.stock_entry.insert(0, actual_symbol)
                         self.price_var.set(str(ltp))
-                        messagebox.showinfo(
-                            "Success", f"CMP for {actual_symbol} is ₹{ltp}"
-                        )
-
+                        messagebox.showinfo("Success", f"CMP for {actual_symbol} is ₹{ltp}")
                     self.after(0, update_ui)
                 else:
                     self.after(
@@ -400,26 +326,15 @@ class TradeForm(ctk.CTkFrame):
                 err_msg = str(e)
                 self.after(
                     0,
-                    lambda: messagebox.showerror(
-                        "API Error", f"An error occurred: {err_msg}"
-                    ),
+                    lambda: messagebox.showerror("API Error", f"An error occurred: {err_msg}"),
                 )
             finally:
-                self.after(
-                    0,
-                    lambda: self.fetch_cmp_btn.configure(
-                        text="Fetch CMP", state="normal"
-                    ),
-                )
+                self.after(0, lambda: self.fetch_cmp_btn.configure(text="Fetch CMP", state="normal"))
 
         threading.Thread(target=background_fetch, daemon=True).start()
 
-    # ─────────────────── Submit ────────────────────
-
     def submit_trade(self):
         try:
-            action_map = {"LONG": "BUY", "SHORT": "SELL"}
-
             def _float_or_none(val):
                 v = val.strip() if val else ""
                 return float(v) if v else None
@@ -433,7 +348,7 @@ class TradeForm(ctk.CTkFrame):
             trade_data = {
                 "stock_name": self.stock_entry.get().strip().upper(),
                 "segment": self.segment_var.get(),
-                "action": action_map.get(self.action_var.get(), self.action_var.get()),
+                "action": to_db_action(self.action_var.get()),
                 "entry_price": float(self.price_var.get() or 0),
                 "target": float(self.target_var.get() or 0),
                 "stop_loss": float(self.sl_var.get() or 0),
@@ -472,133 +387,39 @@ class TradeForm(ctk.CTkFrame):
             trade_id, trade_data = insert_trade(trade_data)
 
             def process_services():
-                service_results = {
-                    "google_sheets": None,
-                    "telegram": None,
-                    "image": None,
-                }
-
-                # 2. Generate Image
-                img_gen = ImageGenerator()
-                img_path = img_gen.generate_trade_image(trade_data)
-                service_results["image"] = img_path is not None
-
-                # 3. Update Google Sheets
-                try:
-                    gs = GoogleSheetsService()
-                    if gs.is_configured():
-                        result = gs.append_trade(trade_data)
-                        if result.get("unmapped_columns"):
-                            self.after(
-                                0,
-                                lambda cols=result["unmapped_columns"]: messagebox.showwarning(
-                                    "Unmapped Columns",
-                                    "The following columns in your Google Sheet are NOT mapped:\n\n"
-                                    f"{', '.join(cols)}\n\n"
-                                    "Data for these columns will not be written.",
-                                ),
-                            )
-                        service_results["google_sheets"] = True if result.get("success") else result.get("error")
-                    else:
-                        service_results["google_sheets"] = "not_configured"
-                except EmptySheetError:
-
-                    def prompt_empty_sheet():
-                        ans = messagebox.askyesno(
-                            "Empty Sheet",
-                            "The Google Sheet is currently empty.\n\nDo you want to fill the default headers automatically?",
-                        )
-
-                        def run_after_prompt():
-                            try:
-                                gs = GoogleSheetsService()
-                                if ans:
-                                    gs.connect()
-                                    gs._write_header()
-                                gs.append_trade(trade_data, skip_header_check=True)
-                                self.after(
-                                    0,
-                                    lambda: self._on_service_success("google_sheets", True),
-                                )
-                            except Exception as e:
-                                logger.error(f"Sheets Retry Error: {e}", exc_info=True)
-                                self.after(
-                                    0,
-                                    lambda: self._on_service_error("google_sheets", str(e)),
-                                )
-
-                        threading.Thread(target=run_after_prompt, daemon=True).start()
-
-                except Exception as e:
-                    logger.error(f"Sheets Error: {e}", exc_info=True)
-                    service_results["google_sheets"] = str(e)
-
-                # 4. Send Telegram Message
-                try:
-                    tg = TelegramService()
-                    if tg.is_configured():
-
-                        async def send_tg():
-                            try:
-                                await tg.connect()
-                                msg = format_new_trade(trade_data)
-                                await tg.send_trade_message(msg, img_path)
-                                await tg.disconnect()
-                                return True
-                            except Exception as e:
-                                logger.error(f"Telegram send error: {e}", exc_info=True)
-                                raise
-
-                        success = run_async(send_tg())
-                        service_results["telegram"] = success if success else True
-                    else:
-                        service_results["telegram"] = "not_configured"
-                except Exception as e:
-                    logger.error(f"Telegram Error: {e}", exc_info=True)
-                    service_results["telegram"] = str(e)
-
-                self.after(
-                    0,
-                    self._on_submit_complete,
-                    trade_data.get("trade_code", str(trade_id)),
-                    service_results,
-                )
+                result = controller.broadcast_new_trade(trade_data)
+                self.after(0, self._on_submit_complete, trade_data.get("trade_code", str(trade_id)), result)
 
             threading.Thread(target=process_services, daemon=True).start()
 
         except Exception as e:
             logger.error(f"Failed to save trade to DB: {e}", exc_info=True)
             messagebox.showerror("Database Error", f"Failed to save trade: {e}")
-            self.submit_btn.configure(
-                text="✦  Submit Trade & Broadcast", state="normal"
-            )
+            self.submit_btn.configure(text="✦  Submit Trade & Broadcast", state="normal")
 
-    def _on_submit_complete(self, trade_code, results):
+    def _on_submit_complete(self, trade_code, result: BroadcastResult):
         errors = []
 
-        gs_result = results.get("google_sheets")
-        tg_result = results.get("telegram")
+        if result.sheets_success == "not_configured":
+            errors.append("Google Sheets: Not configured")
+        elif not result.sheets_success:
+            errors.append("Google Sheets: Failed")
 
-        if gs_result is None or gs_result == "not_configured":
-            if gs_result == "not_configured":
-                errors.append("Google Sheets: Not configured")
-            elif gs_result:
-                pass  # Success
-            else:
-                errors.append("Google Sheets: Failed")
+        if result.telegram_success == "not_configured":
+            errors.append("Telegram: Not configured")
+        elif not result.telegram_success:
+            errors.append("Telegram: Failed")
 
-        if tg_result is None or tg_result == "not_configured":
-            if tg_result == "not_configured":
-                errors.append("Telegram: Not configured")
-            elif tg_result:
-                pass  # Success
-            else:
-                errors.append("Telegram: Failed")
+        if result.sheets_unmapped:
+            messagebox.showwarning(
+                "Unmapped Columns",
+                "The following columns in your Google Sheet are NOT mapped:\n\n"
+                f"{', '.join(result.sheets_unmapped)}\n\n"
+                "Data for these columns will not be written.",
+            )
 
         if not errors:
-            messagebox.showinfo(
-                "Success", f"Trade {trade_code} saved and broadcasted successfully!"
-            )
+            messagebox.showinfo("Success", f"Trade {trade_code} saved and broadcasted successfully!")
         elif len(errors) == 2:
             messagebox.showwarning(
                 "Partial Success",
@@ -616,12 +437,6 @@ class TradeForm(ctk.CTkFrame):
         self.clear_form()
         self.submit_btn.configure(text="✦  Submit Trade & Broadcast", state="normal")
         self.master.show_active_trades()
-
-    def _on_service_success(self, service_name, success):
-        logger.info(f"{service_name} operation completed: {success}")
-
-    def _on_service_error(self, service_name, error_msg):
-        logger.error(f"{service_name} operation failed: {error_msg}")
 
     def clear_form(self):
         self.stock_entry.delete(0, "end")

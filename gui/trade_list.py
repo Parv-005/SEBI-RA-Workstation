@@ -1,5 +1,20 @@
 import customtkinter as ctk
 from database.db_manager import get_all_trades
+from utils.constants_loader import get_constant
+from services.trade_service import to_display_action
+from utils.logger import setup_logger
+
+logger = setup_logger("TradeList")
+
+STATUS_COLORS = get_constant("status_colors", {
+    "ACTIVE": "#17a2b8",
+    "TARGET_HIT": "#28a745",
+    "SL_HIT": "#dc3545",
+    "EXITED": "gray",
+})
+
+STATUSES = list(STATUS_COLORS.keys()) + ["ALL"]
+
 
 class TradeList(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
@@ -8,7 +23,6 @@ class TradeList(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # Header
         self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         self.header_frame.grid_columnconfigure(3, weight=1)
@@ -18,10 +32,9 @@ class TradeList(ctk.CTkFrame):
             font=ctk.CTkFont(size=24, weight="bold")
         ).grid(row=0, column=0, sticky="w")
 
-        # Filters
         self.status_filter = ctk.CTkOptionMenu(
             self.header_frame,
-            values=["ACTIVE", "TARGET_HIT", "SL_HIT", "EXITED", "ALL"],
+            values=STATUSES,
             command=self.refresh_data
         )
         self.status_filter.grid(row=0, column=1, padx=20)
@@ -31,7 +44,6 @@ class TradeList(ctk.CTkFrame):
         )
         self.refresh_btn.grid(row=0, column=2)
 
-        # Table Headers
         self.table_header = ctk.CTkFrame(self)
         self.table_header.grid(row=1, column=0, sticky="ew", pady=(0, 2))
 
@@ -44,7 +56,6 @@ class TradeList(ctk.CTkFrame):
             lbl = ctk.CTkLabel(self.table_header, text=col, font=ctk.CTkFont(weight="bold"))
             lbl.grid(row=0, column=i, pady=5, padx=5, sticky="ew")
 
-        # Scrollable Data Container
         self.data_frame = ctk.CTkScrollableFrame(self)
         self.data_frame.grid(row=2, column=0, sticky="nsew")
 
@@ -59,6 +70,7 @@ class TradeList(ctk.CTkFrame):
         filter_dict = {} if status == "ALL" else {"status": status}
 
         trades = get_all_trades(filter_dict)
+        logger.debug(f"Refreshed trade list with {len(trades)} trades (filter: {filter_dict})")
 
         if not trades:
             ctk.CTkLabel(
@@ -68,9 +80,10 @@ class TradeList(ctk.CTkFrame):
             return
 
         for i, trade in enumerate(trades):
-            date_str = trade['created_at'].split(' ')[0] if trade.get('created_at') else "—"
-            trade_code = trade.get('trade_code') or str(trade['id'])
-            action_color = "#28a745" if trade['action'] == "BUY" else "#dc3545"
+            date_str = str(trade.get('created_at', '—')).split(' ')[0] if trade.get('created_at') else "—"
+            trade_code = trade.get('trade_code') or str(trade.get('id', '?'))
+            action_display = to_display_action(trade.get('action', 'LONG'))
+            action_color = "#28a745" if trade.get('action') == "BUY" else "#dc3545"
 
             row_bg = ("gray95", "gray17") if i % 2 == 0 else ("gray90", "gray20")
 
@@ -83,37 +96,32 @@ class TradeList(ctk.CTkFrame):
                 row=i, column=1, pady=2, padx=5
             )
             ctk.CTkLabel(
-                self.data_frame, text=trade['stock_name'],
+                self.data_frame, text=trade.get('stock_name', '—'),
                 font=ctk.CTkFont(weight="bold")
             ).grid(row=i, column=2, pady=2, padx=5)
 
-            ctk.CTkLabel(self.data_frame, text=trade['segment']).grid(
+            ctk.CTkLabel(self.data_frame, text=trade.get('segment', '—')).grid(
                 row=i, column=3, pady=2, padx=5
             )
             ctk.CTkLabel(
-                self.data_frame, text=trade['action'],
+                self.data_frame, text=action_display,
                 text_color=action_color, font=ctk.CTkFont(weight="bold")
             ).grid(row=i, column=4, pady=2, padx=5)
 
-            ctk.CTkLabel(self.data_frame, text=f"₹{trade['entry_price']}").grid(
+            ctk.CTkLabel(self.data_frame, text=f"₹{trade.get('entry_price', '—')}").grid(
                 row=i, column=5, pady=2, padx=5
             )
-            ctk.CTkLabel(self.data_frame, text=f"₹{trade['target']}").grid(
+            ctk.CTkLabel(self.data_frame, text=f"₹{trade.get('target', '—')}").grid(
                 row=i, column=6, pady=2, padx=5
             )
-            ctk.CTkLabel(self.data_frame, text=f"₹{trade['stop_loss']}").grid(
+            ctk.CTkLabel(self.data_frame, text=f"₹{trade.get('stop_loss', '—')}").grid(
                 row=i, column=7, pady=2, padx=5
             )
 
-            status_colors = {
-                "ACTIVE":     "#17a2b8",
-                "TARGET_HIT": "#28a745",
-                "SL_HIT":     "#dc3545",
-                "EXITED":     "gray",
-            }
+            status_colors = STATUS_COLORS if isinstance(STATUS_COLORS, dict) else {}
             status_lbl = ctk.CTkLabel(
-                self.data_frame, text=trade['status'],
-                text_color=status_colors.get(trade['status'], "white")
+                self.data_frame, text=trade.get('status', '—'),
+                text_color=status_colors.get(trade.get('status'), "white")
             )
             status_lbl.grid(row=i, column=8, pady=2, padx=5)
 

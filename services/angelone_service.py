@@ -3,17 +3,18 @@ import json
 import pyotp
 from SmartApi import SmartConnect
 from core.paths import CONFIG_PATH
+from utils.constants_loader import get_constant
 from utils.logger import setup_logger
 
 logger = setup_logger("AngelOneService")
 
-EXCHANGE_MAP = {
+EXCHANGE_MAP = get_constant("exchange_map", {
     "Cash": "NSE",
     "F&O": "NFO",
     "MCX": "MCX",
     "Currency": "CDS",
     "Index": "NSE",
-}
+})
 
 
 class AngelOneService:

@@ -4,6 +4,7 @@ from pathlib import Path
 import gspread
 from google.oauth2.service_account import Credentials
 from core.paths import CONFIG_PATH
+from services.results import AppendResult
 from utils.logger import setup_logger
 
 logger = setup_logger("GoogleSheetsService")
@@ -12,10 +13,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
-
-
-class EmptySheetError(Exception):
-    pass
 
 
 class GoogleSheetsService:
@@ -71,33 +68,24 @@ class GoogleSheetsService:
 
         self.sheet.update("A1", [DEFAULT_HEADERS()])
 
-    def append_trade(self, trade: dict, skip_header_check: bool = False) -> dict:
-        result = {"success": False, "unmapped_columns": [], "error": None}
+    def append_trade(self, trade: dict) -> AppendResult:
+        result = AppendResult(success=False)
         try:
             if not self.sheet:
                 self.connect()
 
+            from utils.column_mapper import DEFAULT_HEADERS, get_headers_schema, map_trade_to_columns
+
             headers = self.sheet.row_values(1)
             if not headers:
-                if not skip_header_check:
-                    raise EmptySheetError(
-                        "Google Sheet is empty and requires initialization."
-                    )
-                else:
-                    from utils.column_mapper import DEFAULT_HEADERS
-
-                    headers = DEFAULT_HEADERS()
-
-            from utils.column_mapper import get_headers_schema
+                self._write_header()
+                headers = DEFAULT_HEADERS()
 
             schema = get_headers_schema()
             known_labels = [item.get("label") for item in schema]
-            unmapped = [h for h in headers if h not in known_labels and h.strip()]
-            result["unmapped_columns"] = unmapped
+            result.unmapped_columns = [h for h in headers if h not in known_labels and h.strip()]
 
             row_num = len(self.sheet.col_values(1)) + 1
-
-            from utils.column_mapper import map_trade_to_columns
 
             row = map_trade_to_columns(
                 trade, headers, is_google_sheets=True, row_num=row_num
@@ -105,10 +93,10 @@ class GoogleSheetsService:
 
             self.sheet.append_row(row, value_input_option="USER_ENTERED")
             logger.info(f"Appended trade {trade.get('trade_code')} to Google Sheets.")
-            result["success"] = True
+            result.success = True
         except Exception as e:
             logger.error(f"Error appending trade to Google Sheets: {e}", exc_info=True)
-            result["error"] = str(e)
+            result.error = str(e)
             raise
 
         return result
@@ -151,7 +139,9 @@ class GoogleSheetsService:
 
             schema = get_headers_schema()
 
-            all_update_keys = set(list(update_data.keys()) + list(trade_updates.keys() if trade_updates else []))
+            METADATA_KEYS = {"update_type", "details", "old_value", "new_value", "_trade_updates"}
+            trade_keys = {k: v for k, v in update_data.items() if k not in METADATA_KEYS}
+            all_update_keys = set(list(trade_keys.keys()) + list((trade_updates or {}).keys()))
 
             for key in all_update_keys:
                 val = update_data.get(key) if key in update_data else (trade_updates or {}).get(key, "")

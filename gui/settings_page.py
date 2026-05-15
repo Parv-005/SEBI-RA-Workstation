@@ -2,6 +2,9 @@ import customtkinter as ctk
 import tkinter.messagebox as messagebox
 import tkinter.filedialog as filedialog
 from utils.config_manager import load_config, save_config
+from utils.logger import setup_logger
+
+logger = setup_logger("SettingsPage")
 
 
 class SettingsPage(ctk.CTkFrame):
@@ -19,7 +22,6 @@ class SettingsPage(ctk.CTkFrame):
 
         self.config = self._load_config()
 
-        # --- Telegram Settings ---
         self._add_section_header("Telegram API (Telethon)", row=0)
         tg = self.config.get("telegram", {})
         self.tg_api_id = self._add_entry("API ID:", tg.get("api_id", ""), row=1)
@@ -27,13 +29,11 @@ class SettingsPage(ctk.CTkFrame):
         self.tg_phone = self._add_entry("Phone Number (+91...):", tg.get("phone", ""), row=3)
         self.tg_group = self._add_entry("Group/Channel ID:", tg.get("group_id", ""), row=4)
 
-        # --- Google Sheets Settings ---
         self._add_section_header("Google Sheets Integration", row=5)
         gs = self.config.get("google_sheets", {})
         self.gs_json = self._add_entry_with_browse("Service Account JSON path:", gs.get("service_account_json", ""), row=6)
         self.gs_sheet_id = self._add_entry("Spreadsheet ID:", gs.get("spreadsheet_id", ""), row=7)
 
-        # --- AngelOne Settings ---
         self._add_section_header("AngelOne SmartAPI", row=8)
         ao = self.config.get("angelone", {})
         self.ao_api_key = self._add_entry("API Key:", ao.get("api_key", ""), row=9)
@@ -41,7 +41,6 @@ class SettingsPage(ctk.CTkFrame):
         self.ao_password = self._add_entry("Password (PIN):", ao.get("password", ""), row=11)
         self.ao_totp = self._add_entry("TOTP Secret:", ao.get("totp_secret", ""), row=12)
 
-        # Save Button
         self.save_btn = ctk.CTkButton(self, text="Save Settings", font=ctk.CTkFont(weight="bold"), command=self._save_settings)
         self.save_btn.grid(row=2, column=0, pady=20)
 
@@ -92,18 +91,18 @@ class SettingsPage(ctk.CTkFrame):
             "api_id": self.tg_api_id.get().strip(),
             "api_hash": self.tg_api_hash.get().strip(),
             "phone": self.tg_phone.get().strip(),
-            "group_id": self.tg_group.get().strip()
+            "group_id": self.tg_group.get().strip(),
         }
         config["google_sheets"] = {
             "service_account_json": self.gs_json.get().strip(),
             "spreadsheet_id": self.gs_sheet_id.get().strip(),
-            "sheet_name": "Trades"
+            "sheet_name": config.get("google_sheets", {}).get("sheet_name", "Trades"),
         }
         config["angelone"] = {
             "api_key": self.ao_api_key.get().strip(),
             "client_id": self.ao_client_id.get().strip(),
             "password": self.ao_password.get().strip(),
-            "totp_secret": self.ao_totp.get().strip()
+            "totp_secret": self.ao_totp.get().strip(),
         }
 
         if save_config(config):
