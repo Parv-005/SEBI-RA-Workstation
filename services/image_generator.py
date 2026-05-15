@@ -4,12 +4,12 @@ from datetime import datetime
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+from core.paths import CONFIG_PATH, IMAGES_DIR, ROOT_DIR
 from utils.logger import setup_logger
 
 logger = setup_logger("ImageGenerator")
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "images"
+OUTPUT_DIR = IMAGES_DIR
 
 
 class ImageGenerator:
@@ -29,9 +29,8 @@ class ImageGenerator:
             with open(CONFIG_PATH) as f:
                 config = json.load(f)
             img = config.get("image", {})
-            base = Path(__file__).resolve().parent.parent
-            self.trade_template = str(base / img.get("trade_template", ""))
-            self.update_template = str(base / img.get("update_template", ""))
+            self.trade_template = str(ROOT_DIR / img.get("trade_template", ""))
+            self.update_template = str(ROOT_DIR / img.get("update_template", ""))
             self.font_path = img.get("font_path", "")
             self.font_size = img.get("font_size", 24)
             color = img.get("font_color", [255, 255, 255])

@@ -66,7 +66,7 @@ def test_database():
             risk_reward="2:1",
             remarks="integration-test", status="ACTIVE", cmp_at_entry=101.0,
         )
-        trade_id = insert_trade(dummy)
+        trade_id, dummy = insert_trade(dummy)
         assert isinstance(trade_id, int) and trade_id > 0
         pass_(f"insert_trade() — new trade ID {trade_id}")
 

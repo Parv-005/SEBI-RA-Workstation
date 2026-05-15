@@ -1,6 +1,5 @@
 import asyncio
 import concurrent.futures
-from functools import wraps
 
 _thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 

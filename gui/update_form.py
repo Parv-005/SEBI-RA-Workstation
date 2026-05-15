@@ -1,13 +1,14 @@
 import customtkinter as ctk
 import tkinter.messagebox as messagebox
+from datetime import datetime
 from database.db_manager import update_trade, insert_trade_update
 from utils.logger import setup_logger
-import asyncio
 import threading
 from utils.async_helper import run_async
 from services.image_generator import ImageGenerator
 from services.telegram_service import TelegramService
 from services.google_sheets_service import GoogleSheetsService
+from utils.message_formatter import format_trade_update
 
 logger = setup_logger("UpdateForm")
 
@@ -174,9 +175,7 @@ class UpdateForm(ctk.CTkToplevel):
             elif update_type == "EXIT":
                 trade_updates["status"] = "EXITED"
                 trade_updates["close_narration"] = remarks
-                trade_updates["exit_datetime"] = (
-                    __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                )
+                trade_updates["exit_datetime"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 if new_val_str:
                     try:
                         exit_price = float(new_val_str)
@@ -286,10 +285,10 @@ class UpdateForm(ctk.CTkToplevel):
                 try:
                     gs = GoogleSheetsService()
                     if gs.is_configured():
-                        gs.update_trade_row(
+                        gs_result = gs.update_trade_row(
                             self.trade["id"], update_data_dict, trade_updates
                         )
-                        service_results["google_sheets"] = True
+                        service_results["google_sheets"] = True if gs_result.get("success") else gs_result.get("error", "Failed")
                     else:
                         service_results["google_sheets"] = "not_configured"
                 except Exception as e:
@@ -304,8 +303,6 @@ class UpdateForm(ctk.CTkToplevel):
                         async def send_tg():
                             try:
                                 await tg.connect()
-                                from utils.message_formatter import format_trade_update
-
                                 msg = format_trade_update(self.trade, update_data_dict)
                                 await tg.send_update_message(msg, img_path)
                                 await tg.disconnect()
@@ -333,12 +330,6 @@ class UpdateForm(ctk.CTkToplevel):
             logger.error(f"Failed to process update form: {e}", exc_info=True)
             messagebox.showerror("Database Error", f"Failed to save update: {e}")
             self.submit_btn.configure(text="Broadcast Update", state="normal")
-
-    def _on_success(self):
-        messagebox.showinfo("Success", "Update saved and broadcasted successfully!")
-        if self.on_success:
-            self.on_success()
-        self.destroy()
 
     def _on_update_complete(self, results):
         errors = []

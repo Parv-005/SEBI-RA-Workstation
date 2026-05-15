@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 
@@ -89,7 +90,6 @@ def format_trade_update(trade: dict, update: dict) -> str:
     ]
 
     if update_type in ("TRAIL_SL", "MODIFY_SL") and update.get("new_value"):
-        import json
         new_val = update["new_value"]
         if isinstance(new_val, str):
             new_val = json.loads(new_val)
@@ -100,7 +100,6 @@ def format_trade_update(trade: dict, update: dict) -> str:
         lines.append(f"🛑 New SL      : ₹{new_val.get('stop_loss', 'N/A')}")
 
     elif update_type == "MODIFY_TARGET" and update.get("new_value"):
-        import json
         new_val = update["new_value"]
         if isinstance(new_val, str):
             new_val = json.loads(new_val)

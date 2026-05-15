@@ -1,13 +1,14 @@
 import customtkinter as ctk
 import tkinter.messagebox as messagebox
+import threading
 from database.db_manager import insert_trade
 from utils.logger import setup_logger
-import asyncio
-import threading
 from utils.async_helper import run_async
+from utils.constants_loader import get_constant
+from utils.message_formatter import format_new_trade
 from services.image_generator import ImageGenerator
 from services.telegram_service import TelegramService
-from services.google_sheets_service import GoogleSheetsService
+from services.google_sheets_service import GoogleSheetsService, EmptySheetError
 
 logger = setup_logger("TradeForm")
 
@@ -108,8 +109,6 @@ class TradeForm(ctk.CTkFrame):
 
         # Trade Type
         _field_label(ff, "Trade Type:", r, 0)
-
-        from utils.constants_loader import get_constant
 
         trade_types = get_constant(
             "trade_types", ["Intraday", "BTST", "Positional", "Short-term", "Long-term"]
@@ -470,8 +469,7 @@ class TradeForm(ctk.CTkFrame):
         self.submit_btn.configure(text="Processing...", state="disabled")
 
         try:
-            # insert_trade now also fetches the row back and merges created_at, trade_code, etc.
-            trade_id = insert_trade(trade_data)
+            trade_id, trade_data = insert_trade(trade_data)
 
             def process_services():
                 service_results = {
@@ -486,46 +484,51 @@ class TradeForm(ctk.CTkFrame):
                 service_results["image"] = img_path is not None
 
                 # 3. Update Google Sheets
-                from services.google_sheets_service import (
-                    GoogleSheetsService,
-                    EmptySheetError,
-                )
-
-                def prompt_empty_sheet():
-                    ans = messagebox.askyesno(
-                        "Empty Sheet",
-                        "The Google Sheet is currently empty.\n\nDo you want to fill the default headers automatically?",
-                    )
-
-                    def run_after_prompt():
-                        try:
-                            gs = GoogleSheetsService()
-                            if ans:
-                                gs.connect()
-                                gs._write_header()
-                            gs.append_trade(trade_data, skip_header_check=True)
-                            self.after(
-                                0,
-                                lambda: self._on_service_success("google_sheets", True),
-                            )
-                        except Exception as e:
-                            logger.error(f"Sheets Retry Error: {e}", exc_info=True)
-                            self.after(
-                                0,
-                                lambda: self._on_service_error("google_sheets", str(e)),
-                            )
-
-                    threading.Thread(target=run_after_prompt, daemon=True).start()
-
                 try:
                     gs = GoogleSheetsService()
                     if gs.is_configured():
-                        gs.append_trade(trade_data)
-                        service_results["google_sheets"] = True
+                        result = gs.append_trade(trade_data)
+                        if result.get("unmapped_columns"):
+                            self.after(
+                                0,
+                                lambda cols=result["unmapped_columns"]: messagebox.showwarning(
+                                    "Unmapped Columns",
+                                    "The following columns in your Google Sheet are NOT mapped:\n\n"
+                                    f"{', '.join(cols)}\n\n"
+                                    "Data for these columns will not be written.",
+                                ),
+                            )
+                        service_results["google_sheets"] = True if result.get("success") else result.get("error")
                     else:
                         service_results["google_sheets"] = "not_configured"
                 except EmptySheetError:
-                    self.after(0, prompt_empty_sheet)
+
+                    def prompt_empty_sheet():
+                        ans = messagebox.askyesno(
+                            "Empty Sheet",
+                            "The Google Sheet is currently empty.\n\nDo you want to fill the default headers automatically?",
+                        )
+
+                        def run_after_prompt():
+                            try:
+                                gs = GoogleSheetsService()
+                                if ans:
+                                    gs.connect()
+                                    gs._write_header()
+                                gs.append_trade(trade_data, skip_header_check=True)
+                                self.after(
+                                    0,
+                                    lambda: self._on_service_success("google_sheets", True),
+                                )
+                            except Exception as e:
+                                logger.error(f"Sheets Retry Error: {e}", exc_info=True)
+                                self.after(
+                                    0,
+                                    lambda: self._on_service_error("google_sheets", str(e)),
+                                )
+
+                        threading.Thread(target=run_after_prompt, daemon=True).start()
+
                 except Exception as e:
                     logger.error(f"Sheets Error: {e}", exc_info=True)
                     service_results["google_sheets"] = str(e)
@@ -538,8 +541,6 @@ class TradeForm(ctk.CTkFrame):
                         async def send_tg():
                             try:
                                 await tg.connect()
-                                from utils.message_formatter import format_new_trade
-
                                 msg = format_new_trade(trade_data)
                                 await tg.send_trade_message(msg, img_path)
                                 await tg.disconnect()
@@ -571,14 +572,6 @@ class TradeForm(ctk.CTkFrame):
             self.submit_btn.configure(
                 text="✦  Submit Trade & Broadcast", state="normal"
             )
-
-    def _on_submit_success(self, trade_code):
-        messagebox.showinfo(
-            "Success", f"Trade {trade_code} saved and broadcasted successfully!"
-        )
-        self.clear_form()
-        self.submit_btn.configure(text="✦  Submit Trade & Broadcast", state="normal")
-        self.master.show_active_trades()
 
     def _on_submit_complete(self, trade_code, results):
         errors = []

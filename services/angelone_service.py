@@ -1,13 +1,11 @@
 import json
-from pathlib import Path
 
 import pyotp
 from SmartApi import SmartConnect
+from core.paths import CONFIG_PATH
 from utils.logger import setup_logger
 
 logger = setup_logger("AngelOneService")
-
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
 
 EXCHANGE_MAP = {
     "Cash": "NSE",

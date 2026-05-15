@@ -11,18 +11,13 @@ Settings (get_setting / set_setting) are stored in data/settings.json.
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
 
 import openpyxl
 from openpyxl import load_workbook, Workbook
+from core.paths import DATA_DIR, TRADES_PATH, UPDATES_PATH, SETTINGS_PATH
 from utils.logger import setup_logger
 
 logger = setup_logger("DBManager")
-
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-TRADES_PATH = DATA_DIR / "trades.xlsx"
-UPDATES_PATH = DATA_DIR / "trade_updates.xlsx"
-SETTINGS_PATH = DATA_DIR / "settings.json"
 
 # ─── Column definitions ────────────────────────────────────────────────────────
 
@@ -141,12 +136,15 @@ def init_db():
         raise
 
 
-def insert_trade(trade_data: dict) -> int:
-    """Append a new trade row to trades.xlsx. Returns the new integer trade id.
-    Also mutates trade_data in-place with id, trade_code, created_at, updated_at."""
+def insert_trade(trade_data: dict) -> tuple[int, dict]:
+    """Append a new trade row to trades.xlsx.
+
+    Returns a tuple of (trade_id, enriched_trade_data) where enriched_trade_data
+    is a copy of trade_data with id, trade_code, created_at, and updated_at added.
+    The original trade_data dict is NOT mutated.
+    """
     try:
         _ensure_data_dir()
-        # Fetch existing headers
         try:
             wb = load_workbook(TRADES_PATH)
             ws = wb.active
@@ -161,22 +159,17 @@ def insert_trade(trade_data: dict) -> int:
         trade_id = _next_id(ws)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Mutate caller's dict so mapping catches them
-        trade_data["id"] = trade_id
-        trade_data["trade_code"] = trade_code
-        trade_data["created_at"] = now
-        trade_data["updated_at"] = now
+        enriched = {**trade_data, "id": trade_id, "trade_code": trade_code, "created_at": now, "updated_at": now}
 
-        # Map to columns
-        row = map_trade_to_columns(trade_data, headers, is_google_sheets=False)
+        row = map_trade_to_columns(enriched, headers, is_google_sheets=False)
 
         ws.append(row)
         _save_trades(wb)
 
         logger.info(
-            f"Inserted trade ID {trade_id} code {trade_code} ({trade_data.get('stock_name')})"
+            f"Inserted trade ID {trade_id} code {trade_code} ({enriched.get('stock_name')})"
         )
-        return trade_id
+        return trade_id, enriched
     except Exception as e:
         logger.error(f"Error inserting trade: {e}", exc_info=True)
         raise

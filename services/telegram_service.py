@@ -1,14 +1,12 @@
 import json
 import os
-from pathlib import Path
 
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
+from core.paths import CONFIG_PATH, TELEGRAM_SESSION_DIR
 from utils.logger import setup_logger
 
 logger = setup_logger("TelegramService")
-
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
 
 
 class TelegramService:
@@ -39,8 +37,7 @@ class TelegramService:
             logger.error("Telegram credentials not configured.")
             raise ValueError("Telegram credentials not configured.")
         try:
-            session_path = Path(__file__).resolve().parent.parent / "telegram_session"
-            self.client = TelegramClient(str(session_path), int(self.api_id), self.api_hash)
+            self.client = TelegramClient(str(TELEGRAM_SESSION_DIR / "telegram_session"), int(self.api_id), self.api_hash)
             await self.client.connect()
             if not await self.client.is_user_authorized():
                 logger.info("User not authorized. Sending code request.")

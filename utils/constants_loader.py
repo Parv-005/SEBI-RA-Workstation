@@ -1,12 +1,22 @@
 import json
-from pathlib import Path
+from core.paths import CONSTANTS_PATH
 
-CONSTANTS_PATH = Path(__file__).resolve().parent.parent / "data" / "app_constants.json"
+_cache: dict | None = None
+
 
 def get_constant(key: str, default=None):
-    """Retrieve a configuration array or string from app_constants.json safely."""
-    if not CONSTANTS_PATH.exists():
-        raise FileNotFoundError(f"Configuration file {CONSTANTS_PATH} is missing!")
-    
-    with open(CONSTANTS_PATH, "r") as f:
-        return json.load(f).get(key, default)
+    global _cache
+    if _cache is None:
+        if not CONSTANTS_PATH.exists():
+            raise FileNotFoundError(f"Configuration file {CONSTANTS_PATH} is missing!")
+        try:
+            with open(CONSTANTS_PATH, "r") as f:
+                _cache = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in {CONSTANTS_PATH}: {e}")
+    return _cache.get(key, default)
+
+
+def clear_cache():
+    global _cache
+    _cache = None

@@ -1,9 +1,8 @@
 import customtkinter as ctk
 import tkinter.messagebox as messagebox
 import tkinter.filedialog as filedialog
-import json
-from pathlib import Path
-from utils.config_manager import CONFIG_PATH
+from utils.config_manager import load_config, save_config
+
 
 class SettingsPage(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
@@ -47,11 +46,7 @@ class SettingsPage(ctk.CTkFrame):
         self.save_btn.grid(row=2, column=0, pady=20)
 
     def _load_config(self):
-        import os
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH) as f:
-                return json.load(f)
-        return {}
+        return load_config()
 
     def _add_section_header(self, text, row):
         lbl = ctk.CTkLabel(self.scroll_frame, text=text, font=ctk.CTkFont(size=18, weight="bold"))
@@ -66,7 +61,6 @@ class SettingsPage(ctk.CTkFrame):
         return entry
 
     def _add_entry_with_browse(self, label_text, default_val, row):
-        """Entry + Browse button row for file-path fields."""
         ctk.CTkLabel(self.scroll_frame, text=label_text).grid(row=row, column=0, sticky="w", padx=10, pady=5)
 
         container = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
@@ -112,7 +106,7 @@ class SettingsPage(ctk.CTkFrame):
             "totp_secret": self.ao_totp.get().strip()
         }
 
-        with open(CONFIG_PATH, "w") as f:
-            json.dump(config, f, indent=4)
-
-        messagebox.showinfo("Success", "Settings saved successfully!\nRestart app or re-connect services if required.")
+        if save_config(config):
+            messagebox.showinfo("Success", "Settings saved successfully!\nRestart app or re-connect services if required.")
+        else:
+            messagebox.showerror("Error", "Failed to save settings.")

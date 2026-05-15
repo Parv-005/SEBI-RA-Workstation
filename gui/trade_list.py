@@ -1,5 +1,4 @@
 import customtkinter as ctk
-import tkinter.messagebox as messagebox
 from database.db_manager import get_all_trades
 
 class TradeList(ctk.CTkFrame):
