@@ -26,7 +26,7 @@ class TradeList(ctk.CTkFrame):
 
         self.status_filter = ctk.CTkOptionMenu(
             self.header_frame,
-            values=STATUSES,
+            values=["ALL"] + list(STATUSES),
             command=self.refresh_data
         )
         self.status_filter.grid(row=0, column=1, padx=20)

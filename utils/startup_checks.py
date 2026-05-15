@@ -16,12 +16,14 @@ _DEFAULT_CONSTANTS = {
         {"key": "entry_price", "label": "Entry Price", "type": "string"},
         {"key": "zone", "label": "Entry Price Zone", "type": "custom"},
         {"key": "stop_loss", "label": "Stop Loss", "type": "string"},
+        {"key": "latest_sl_price", "label": "Latest Stop Loss", "type": "string"},
         {"key": "remarks", "label": "Trade Instructions", "type": "string"},
         {"key": "risk_reward", "label": "Risk Reward Ratio", "type": "string"},
         {"key": "risk", "label": "Risk", "type": "string"},
         {"key": "reward", "label": "Reward", "type": "string"},
         {"key": "approx_time", "label": "Approx Time", "type": "string"},
         {"key": "target", "label": "Target", "type": "string"},
+        {"key": "latest_target", "label": "Latest Target", "type": "string"},
         {
             "key": "cmp",
             "label": "CMP",
@@ -36,11 +38,12 @@ _DEFAULT_CONSTANTS = {
             "template": "=IF(ISBLANK({cmp_col}{row}), \"\", IF({action_col}{row}=\"LONG\", {cmp_col}{row}-{entry_col}{row}, {entry_col}{row}-{cmp_col}{row}))",
             "dependencies": ["cmp", "action", "entry_price"],
         },
-        {"key": "status", "label": "Trade Status (ACTIVE/CLOSE)", "type": "string"},
-        {"key": "close_narration", "label": "Trade Close Narration", "type": "string"},
+        {"key": "status", "label": "Status", "type": "string"},
+        {"key": "close_narration", "label": "Close Narration", "type": "string"},
         {"key": "exit_price", "label": "Trade Exit Price", "type": "string"},
         {"key": "exit_datetime", "label": "Trade Exit DateTime", "type": "string"},
         {"key": "holding_period", "label": "Holding Period", "type": "string"},
+        {"key": "updates", "label": "Updates", "type": "string"},
     ],
     "trade_types": [
         "INTRADAY",
@@ -57,39 +60,64 @@ _DEFAULT_CONSTANTS = {
         "display_to_db": {"LONG": "BUY", "SHORT": "SELL"},
         "db_to_display": {"BUY": "LONG", "SELL": "SHORT"},
     },
-    "statuses": ["ACTIVE", "TARGET_HIT", "SL_HIT", "EXITED"],
+    "statuses": ["ACTIVE", "CLOSED"],
     "update_types": {
         "TARGET_HIT": {
             "close_trade": True,
-            "message": "Target Achieved! Book Profits at <Exit Price>."
+            "message": "Target Achieved! Book Profits at <Exit Price>.",
+            "set": {
+                "exit_price": "<Exit Price>"
+            }
         },
         "SL_HIT": {
             "close_trade": True,
-            "message": "Stop Loss Hit at <Exit Price>. Exit trade."
+            "message": "Stop Loss Hit at <Exit Price>. Exit trade.",
+            "set": {
+                "exit_price": "<Exit Price>"
+            }
         },
         "PARTIAL_PROFIT": {
             "close_trade": False,
-            "message": "Book partial profits at <Booked Price>. Trail SL for rest to <New SL>."
+            "message": "Book partial profits at <Booking Price>. Trail SL for rest to <New SL>.",
+            "set": {
+                "latest_sl_price": "<New SL>",
+                "booked_price": "<Booking Price>"
+            }
         },
         "TRAIL_SL": {
             "close_trade": False,
-            "message": "Update Stop Loss to <New Stop Loss> to protect profits."
+            "message": "Update Stop Loss to <New Stop Loss> to protect profits.",
+            "set": {
+                "latest_sl_price": "<New Stop Loss>"
+            }
         },
         "COST_TO_COST": {
             "close_trade": False,
-            "message": "Trail SL to Cost at <Cost Price>. Hold rest."
+            "message": "Trail SL to Cost at <Cost Price>. Hold rest.",
+            "set": {
+                "latest_sl_price": "<Cost Price>"
+            }
         },
         "EXIT": {
             "close_trade": True,
-            "message": "Exit position at <Exit Price>."
+            "message": "Exit position at <Exit Price>.",
+            "set": {
+                "exit_price": "<Exit Price>"
+            }
         },
         "MODIFY_TARGET": {
             "close_trade": False,
-            "message": "Modify Target to <New Target>."
+            "message": "Modify Target to <New Target>.",
+            "set": {
+                "latest_target": "<New Target>"
+            }
         },
         "MODIFY_SL": {
             "close_trade": False,
-            "message": "Modify Stop Loss to <New Stop Loss>."
+            "message": "Modify Stop Loss to <New Stop Loss>.",
+            "set": {
+                "latest_sl_price": "<New Stop Loss>"
+            }
         }
     },
     "exchange_map": {
@@ -101,9 +129,7 @@ _DEFAULT_CONSTANTS = {
     },
     "status_colors": {
         "ACTIVE": "#17a2b8",
-        "TARGET_HIT": "#28a745",
-        "SL_HIT": "#dc3545",
-        "EXITED": "gray",
+        "CLOSED": "#6c757d",
     },
 }
 

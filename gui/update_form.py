@@ -3,10 +3,11 @@ import customtkinter as ctk
 import tkinter.messagebox as messagebox
 from datetime import datetime
 from database.db_manager import update_trade, insert_trade_update
+from database.updates_db import get_formatted_updates_text
 from utils.logger import setup_logger
 import threading
-from services.trade_service import compute_update_fields
 import re
+from services.trade_service import compute_update_fields, BLOCK_ON_MISSING_EXIT_PRICE
 from utils.constants import UPDATE_TYPES, UPDATE_TYPES_DICT
 from controllers.trade_controller import TradeController
 from services.results import BroadcastResult
@@ -24,7 +25,7 @@ class UpdateForm(ctk.CTkToplevel):
         self.on_success = on_success_callback
 
         self.title(f"Update Trade - {self.trade.get('stock_name', '?')} ({self.trade.get('action', '?')})")
-        self.geometry("600x500")
+        self.geometry("620x560")
         self.resizable(False, False)
 
         self.wait_visibility()
@@ -32,6 +33,7 @@ class UpdateForm(ctk.CTkToplevel):
 
         self.grid_columnconfigure(0, weight=1)
 
+        # ── Trade info banner ──────────────────────────────────────────────────
         info_text = (
             f"Segment: {self.trade.get('segment', '—')} | "
             f"Entry: {self.trade.get('entry_price', '—')} | "
@@ -42,32 +44,50 @@ class UpdateForm(ctk.CTkToplevel):
             row=0, column=0, pady=20, padx=20
         )
 
+        # ── Update type selector ───────────────────────────────────────────────
         ctk.CTkLabel(self, text="Select Update Type:").grid(
             row=1, column=0, sticky="w", padx=40
         )
-        self.update_type_var = ctk.StringVar(value="TARGET_HIT")
+        self.update_type_var = ctk.StringVar(value=UPDATE_TYPES[0] if UPDATE_TYPES else "")
         self.update_type_menu = ctk.CTkOptionMenu(
             self,
             variable=self.update_type_var,
             values=UPDATE_TYPES,
             command=self.on_update_type_change,
         )
-        self.update_type_menu.grid(row=2, column=0, sticky="ew", padx=40, pady=(5, 20))
+        self.update_type_menu.grid(row=2, column=0, sticky="ew", padx=40, pady=(5, 10))
 
+        # ── Close trade indicator ──────────────────────────────────────────────
+        self._close_trade_var = ctk.BooleanVar(value=False)
+        self._close_trade_cb = ctk.CTkCheckBox(
+            self,
+            text="Closes Trade",
+            variable=self._close_trade_var,
+            state="disabled",   # read-only indicator; driven by config
+            fg_color="#dc3545",
+            checkmark_color="white",
+        )
+        self._close_trade_cb.grid(row=3, column=0, sticky="w", padx=40, pady=(0, 10))
+
+        # ── Dynamic input fields frame ─────────────────────────────────────────
         self.dynamic_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.dynamic_frame.grid(row=3, column=0, sticky="nsew", padx=40)
+        self.dynamic_frame.grid(row=4, column=0, sticky="nsew", padx=40)
         self.dynamic_frame.grid_columnconfigure(1, weight=1)
 
-        self.dynamic_inputs = {}
+        self.dynamic_inputs: dict[str, ctk.CTkEntry] = {}
+        # Entry widget used when close_trade=True but exit_price not in set fields
+        self._extra_exit_entry: ctk.CTkEntry | None = None
 
-        ctk.CTkLabel(self, text="Remarks / Details for Message:").grid(
-            row=4, column=0, sticky="w", padx=40, pady=(20, 5)
+        # ── Remarks / message textbox ──────────────────────────────────────────
+        ctk.CTkLabel(self, text="Message:").grid(
+            row=5, column=0, sticky="w", padx=40, pady=(20, 5)
         )
         self.remarks_entry = ctk.CTkTextbox(self, height=80)
-        self.remarks_entry.grid(row=5, column=0, sticky="ew", padx=40)
+        self.remarks_entry.grid(row=6, column=0, sticky="ew", padx=40)
 
+        # ── Buttons ────────────────────────────────────────────────────────────
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.btn_frame.grid(row=6, column=0, pady=30, padx=40, sticky="e")
+        self.btn_frame.grid(row=7, column=0, pady=20, padx=40, sticky="e")
 
         self.cancel_btn = ctk.CTkButton(
             self.btn_frame, text="Cancel", fg_color="gray", command=self.destroy
@@ -81,43 +101,110 @@ class UpdateForm(ctk.CTkToplevel):
 
         self.on_update_type_change(self.update_type_var.get())
 
-    def on_update_type_change(self, update_type):
+    # ── Dynamic field rendering ────────────────────────────────────────────────
+
+    def on_update_type_change(self, update_type: str):
+        """Rebuild dynamic input fields based on the selected update type's config."""
         for widget in self.dynamic_frame.winfo_children():
             widget.destroy()
         self.dynamic_inputs = {}
+        self._extra_exit_entry = None
 
-        message_template = UPDATE_TYPES_DICT.get(update_type, {}).get("message", "")
-        
-        fields = re.findall(r"<(.*?)>", message_template)
-        
-        for i, field in enumerate(fields):
+        update_info = UPDATE_TYPES_DICT.get(update_type, {})
+        close_trade: bool = update_info.get("close_trade", False)
+        set_fields: dict = update_info.get("set", {})
+        message_template: str = update_info.get("message", "")
+
+        # Update the close-trade indicator checkbox
+        self._close_trade_var.set(close_trade)
+
+        # Extract <Placeholder> names from message template
+        template_fields = re.findall(r"<(.*?)>", message_template)
+
+        for i, field in enumerate(template_fields):
             lbl = ctk.CTkLabel(self.dynamic_frame, text=f"{field}:")
-            lbl.grid(row=i, column=0, sticky="w", pady=10)
+            lbl.grid(row=i, column=0, sticky="w", pady=8)
             entry = ctk.CTkEntry(self.dynamic_frame, placeholder_text="0.00")
-            entry.grid(row=i, column=1, sticky="ew", padx=(10, 0), pady=10)
-            
-            def make_trace(current_template):
-                def trace_cb(event=None):
-                    msg = current_template
-                    for f_name, f_entry in self.dynamic_inputs.items():
-                        val = f_entry.get().strip()
-                        if not val:
-                            val = f"<{f_name}>"
-                        msg = msg.replace(f"<{f_name}>", val)
-                    self.remarks_entry.delete("1.0", "end")
-                    self.remarks_entry.insert("1.0", msg)
-                return trace_cb
-            
-            entry.bind("<KeyRelease>", make_trace(message_template))
+            entry.grid(row=i, column=1, sticky="ew", padx=(10, 0), pady=8)
+
+            entry.bind("<KeyRelease>", self._make_message_updater(message_template))
             self.dynamic_inputs[field] = entry
 
+        # If close_trade=True and exit_price is NOT already covered by a set field,
+        # show an extra mandatory "Exit Price" input.
+        exit_price_in_set = "exit_price" in set_fields
+        if close_trade and not exit_price_in_set:
+            row_idx = len(template_fields)
+            lbl = ctk.CTkLabel(
+                self.dynamic_frame,
+                text="Exit Price:  ✱",
+                text_color="#f0ad4e",
+            )
+            lbl.grid(row=row_idx, column=0, sticky="w", pady=8)
+            self._extra_exit_entry = ctk.CTkEntry(
+                self.dynamic_frame,
+                placeholder_text="required — closing price",
+                border_color="#f0ad4e",
+            )
+            self._extra_exit_entry.grid(row=row_idx, column=1, sticky="ew", padx=(10, 0), pady=8)
+
+        # Seed the remarks / message textbox with the template
         self.remarks_entry.delete("1.0", "end")
         self.remarks_entry.insert("1.0", message_template)
+
+    def _make_message_updater(self, template: str):
+        """Return a KeyRelease callback that live-fills the message textbox."""
+        def _cb(event=None):
+            msg = template
+            for f_name, f_entry in self.dynamic_inputs.items():
+                val = f_entry.get().strip() or f"<{f_name}>"
+                msg = msg.replace(f"<{f_name}>", val)
+            self.remarks_entry.delete("1.0", "end")
+            self.remarks_entry.insert("1.0", msg)
+        return _cb
+
+    # ── Submit ─────────────────────────────────────────────────────────────────
 
     def submit_update(self):
         update_type = self.update_type_var.get()
         remarks = self.remarks_entry.get("1.0", "end-1c").strip()
         dynamic_values = {k: v.get().strip() for k, v in self.dynamic_inputs.items()}
+
+        # Include extra exit price if present
+        if self._extra_exit_entry is not None:
+            dynamic_values["Exit Price"] = self._extra_exit_entry.get().strip()
+
+        # ── Exit price validation when closing a trade ─────────────────────────
+        update_info = UPDATE_TYPES_DICT.get(update_type, {})
+        close_trade: bool = update_info.get("close_trade", False)
+        set_fields: dict = update_info.get("set", {})
+
+        if close_trade:
+            # Find the dynamic key that maps to exit_price (from set fields or extra input)
+            exit_price_key = None
+            for field, placeholder in set_fields.items():
+                if field == "exit_price":
+                    exit_price_key = placeholder.strip("<>")
+                    break
+            if exit_price_key is None:
+                exit_price_key = "Exit Price"   # fallback for extra entry
+
+            exit_price_val = dynamic_values.get(exit_price_key, "")
+            if not exit_price_val:
+                if BLOCK_ON_MISSING_EXIT_PRICE:
+                    messagebox.showerror(
+                        "Validation Error",
+                        "Exit Price is required when closing a trade.\n"
+                        "Please enter the exit price before submitting.",
+                    )
+                    return
+                else:
+                    if not messagebox.askyesno(
+                        "Exit Price Missing",
+                        "Exit Price is empty. This trade will be closed without recording an exit price.\n\n"
+                        "Continue anyway?",
+                    ):
+                        return
 
         try:
             trade_updates, old_value, new_value, update_data_dict = compute_update_fields(
@@ -131,18 +218,24 @@ class UpdateForm(ctk.CTkToplevel):
         try:
             self.submit_btn.configure(text="Processing...", state="disabled")
 
+            # Save update record
             insert_trade_update(
                 {
                     "trade_code": self.trade.get("trade_code"),
                     "update_type": update_type,
-                    "details": remarks,
+                    "message": remarks,
                     "old_value": old_value,
                     "new_value": new_value,
                 }
             )
 
+            # Build fresh updates-column text after inserting the new record
+            trade_code = self.trade.get("trade_code")
+            trade_updates["updates"] = get_formatted_updates_text(trade_code)
+
+            # Persist trade field changes
             if trade_updates:
-                update_trade(self.trade.get("trade_code"), trade_updates)
+                update_trade(trade_code, trade_updates)
 
             update_data_dict["_trade_updates"] = trade_updates
 
@@ -166,8 +259,9 @@ class UpdateForm(ctk.CTkToplevel):
             err_msg = result.sheets_success if isinstance(result.sheets_success, str) else "Failed"
             errors.append(f"Google Sheets: {err_msg}")
 
-        if result.telegram_success == "not_configured":
-            errors.append("Telegram: Not configured")
+        if result.telegram_success in ("not_configured", "not_authorized"):
+            reason = "Not configured" if result.telegram_success == "not_configured" else "OTP required — sign in via Settings"
+            errors.append(f"Telegram: {reason}")
         elif result.telegram_success is not True:
             err_msg = result.telegram_success if isinstance(result.telegram_success, str) else "Failed"
             errors.append(f"Telegram: {err_msg}")

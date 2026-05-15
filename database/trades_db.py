@@ -81,6 +81,9 @@ def get_all_trades(filters: dict | None = None) -> list[dict]:
 
 
 def update_trade(trade_code: str, fields: dict) -> bool:
+    if not trade_code or trade_code == "?":
+        raise ValueError("Strict Check Failed: trade_code is required to update a trade.")
+
     try:
         trade_data = get_trade(trade_code)
         if not trade_data:

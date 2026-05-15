@@ -3,25 +3,43 @@ from datetime import datetime
 
 
 def format_new_trade(trade: dict) -> str:
-    action_emoji = "🟢" if trade["action"] == "BUY" else "🔴"
-    segment = trade["segment"]
+    action = trade.get("action", "—")
+    action_emoji = "🟢" if action in ("BUY", "LONG") else "🔴"
+    segment = trade.get("segment", "—")
+    stock_name = trade.get("stock_name", "—")
+
+    try:
+        entry_price_fmt = f"₹{float(trade.get('entry_price', 0)):.2f}"
+    except (ValueError, TypeError):
+        entry_price_fmt = str(trade.get("entry_price", "—"))
 
     lines = [
-        f"{action_emoji} **{trade['action']}** — {trade['stock_name']}",
+        f"{action_emoji} **{action}** — {stock_name}",
         f"━━━━━━━━━━━━━━━━━━━━",
         f"📊 Segment     : {segment}",
-        f"💰 Entry Price : ₹{trade['entry_price']:.2f}",
+        f"💰 Entry Price : {entry_price_fmt}",
     ]
 
     # Zone (optional)
     if trade.get("zone_start") and trade.get("zone_end"):
-        lines.append(
-            f"📍 Entry Zone  : ₹{trade['zone_start']:.2f} – ₹{trade['zone_end']:.2f}"
-        )
+        try:
+            lines.append(f"📍 Entry Zone  : ₹{float(trade['zone_start']):.2f} – ₹{float(trade['zone_end']):.2f}")
+        except (ValueError, TypeError):
+            lines.append(f"📍 Entry Zone  : {trade['zone_start']} – {trade['zone_end']}")
+
+    try:
+        tgt_fmt = f"₹{float(trade.get('target', 0)):.2f}"
+    except (ValueError, TypeError):
+        tgt_fmt = str(trade.get('target', '—'))
+
+    try:
+        sl_fmt = f"₹{float(trade.get('stop_loss', 0)):.2f}"
+    except (ValueError, TypeError):
+        sl_fmt = str(trade.get('stop_loss', '—'))
 
     lines += [
-        f"🎯 Target      : ₹{trade['target']:.2f}",
-        f"🛑 Stop Loss   : ₹{trade['stop_loss']:.2f}",
+        f"🎯 Target      : {tgt_fmt}",
+        f"🛑 Stop Loss   : {sl_fmt}",
     ]
 
     if trade.get("trade_type"):
@@ -33,23 +51,33 @@ def format_new_trade(trade: dict) -> str:
     lines.append(f"━━━━━━━━━━━━━━━━━━━━")
 
     if trade.get("reward") or trade.get("risk"):
+        try:
+            reward_fmt = f"₹{float(trade.get('reward', 0)):.2f} ({float(trade.get('reward_pct', 0)):.2f}%)"
+            risk_fmt = f"₹{float(trade.get('risk', 0)):.2f} ({float(trade.get('risk_pct', 0)):.2f}%)"
+        except (ValueError, TypeError):
+            reward_fmt = str(trade.get("reward", "—"))
+            risk_fmt = str(trade.get("risk", "—"))
+
         lines += [
-            f"🟢 Reward      : ₹{trade.get('reward', 0):.2f} ({trade.get('reward_pct', 0):.2f}%)",
-            f"🔴 Risk        : ₹{trade.get('risk', 0):.2f} ({trade.get('risk_pct', 0):.2f}%)",
+            f"🟢 Reward      : {reward_fmt}",
+            f"🔴 Risk        : {risk_fmt}",
         ]
 
     if trade.get("risk_reward"):
         lines.append(f"⚖️  Risk:Reward : {trade['risk_reward']}")
 
     if trade.get("cmp_at_entry"):
-        lines.append(f"📈 CMP         : ₹{trade['cmp_at_entry']:.2f}")
+        try:
+            cmp_fmt = f"₹{float(trade['cmp_at_entry']):.2f}"
+        except (ValueError, TypeError):
+            cmp_fmt = str(trade['cmp_at_entry'])
+        lines.append(f"📈 CMP         : {cmp_fmt}")
 
     if trade.get("remarks"):
         lines.append(f"📝 Remarks     : {trade['remarks']}")
 
     lines.append(f"━━━━━━━━━━━━━━━━━━━━")
 
-    # Use DB timestamp if available, else current time
     ts = trade.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         dt = datetime.strptime(str(ts), "%Y-%m-%d %H:%M:%S")
@@ -65,52 +93,53 @@ def format_new_trade(trade: dict) -> str:
 
 
 def format_trade_update(trade: dict, update: dict) -> str:
-    type_labels = {
-        "TARGET_HIT":    "🎯 TARGET HIT",
-        "SL_HIT":        "🛑 STOP LOSS HIT",
-        "PARTIAL_PROFIT": "💰 PARTIAL PROFIT BOOKED",
-        "TRAIL_SL":      "🔄 STOP LOSS TRAILED",
-        "COST_TO_COST":  "⚖️ MOVED TO COST TO COST",
-        "EXIT":          "🚪 EXIT / CLOSE TRADE",
-        "MODIFY_TARGET": "🎯 TARGET MODIFIED",
-        "MODIFY_SL":     "🛑 STOP LOSS MODIFIED",
-    }
-
     update_type = update.get("update_type", "")
-    label = type_labels.get(update_type, update_type)
+    label = f"🔔 {update_type.replace('_', ' ')}"
+
+    stock = trade.get('stock_name', '—')
+    segment = trade.get('segment', '—')
+    action = trade.get('action', '—')
+    try:
+        entry_price = f"₹{float(trade.get('entry_price', 0)):.2f}"
+    except (ValueError, TypeError):
+        entry_price = str(trade.get('entry_price', '—'))
 
     lines = [
         f"📢 **TRADE UPDATE**",
         f"━━━━━━━━━━━━━━━━━━━━",
         f"{label}",
         f"",
-        f"📊 {trade['stock_name']} ({trade['segment']})",
-        f"📌 Action      : {trade['action']}",
-        f"💰 Entry Price : ₹{trade['entry_price']:.2f}",
+        f"📊 {stock} ({segment})",
+        f"📌 Action      : {action}",
+        f"💰 Entry Price : {entry_price}",
     ]
 
-    if update_type in ("TRAIL_SL", "MODIFY_SL") and update.get("new_value"):
-        new_val = update["new_value"]
-        if isinstance(new_val, str):
-            new_val = json.loads(new_val)
-        old_val = update.get("old_value")
-        if isinstance(old_val, str):
-            old_val = json.loads(old_val)
-        lines.append(f"🛑 Old SL      : ₹{old_val.get('stop_loss', 'N/A')}")
-        lines.append(f"🛑 New SL      : ₹{new_val.get('stop_loss', 'N/A')}")
+    new_val = update.get("new_value")
+    old_val = update.get("old_value")
+    
+    if isinstance(new_val, str):
+        try:
+            new_val = json.loads(new_val) if new_val else {}
+        except Exception:
+            new_val = {}
+    if isinstance(old_val, str):
+        try:
+            old_val = json.loads(old_val) if old_val else {}
+        except Exception:
+            old_val = {}
+            
+    if new_val:
+        for field, n_val in new_val.items():
+            o_val = (old_val or {}).get(field)
+            f_name = field.replace('_', ' ').title()
+            if o_val is not None and str(o_val) != str(n_val):
+                lines.append(f"🔄 {f_name}: {o_val} → {n_val}")
+            else:
+                lines.append(f"🔄 {f_name}: {n_val}")
 
-    elif update_type == "MODIFY_TARGET" and update.get("new_value"):
-        new_val = update["new_value"]
-        if isinstance(new_val, str):
-            new_val = json.loads(new_val)
-        old_val = update.get("old_value")
-        if isinstance(old_val, str):
-            old_val = json.loads(old_val)
-        lines.append(f"🎯 Old Target  : ₹{old_val.get('target', 'N/A')}")
-        lines.append(f"🎯 New Target  : ₹{new_val.get('target', 'N/A')}")
-
-    if update.get("details"):
-        lines.append(f"📝 {update['details']}")
+    msg = update.get("message") or update.get("details")
+    if msg:
+        lines.append(f"📝 {msg}")
 
     lines.append(f"━━━━━━━━━━━━━━━━━━━━")
     lines.append(f"🕐 {datetime.now().strftime('%d-%b-%Y %I:%M %p')}")

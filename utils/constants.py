@@ -26,19 +26,19 @@ ACTION_DB_MAP: dict[str, str] = _actions.get(
 
 # ── Statuses ──────────────────────────────────────────────
 STATUSES: list[str] = get_constant(
-    "statuses", ["ACTIVE", "TARGET_HIT", "SL_HIT", "EXITED"],
+    "statuses", ["ACTIVE", "CLOSED"],
 )
 
 # ── Update Types ──────────────────────────────────────────
 _UPDATE_TYPES_FALLBACK = {
-    "TARGET_HIT": {"close_trade": True, "message": "Target Achieved! Book Profits at <Exit Price>."},
-    "SL_HIT": {"close_trade": True, "message": "Stop Loss Hit at <Exit Price>. Exit trade."},
-    "PARTIAL_PROFIT": {"close_trade": False, "message": "Book partial profits at <Booked Price>. Trail SL for rest to <New SL>."},
-    "TRAIL_SL": {"close_trade": False, "message": "Update Stop Loss to <New Stop Loss> to protect profits."},
-    "COST_TO_COST": {"close_trade": False, "message": "Trail SL to Cost at <Cost Price>. Hold rest."},
-    "EXIT": {"close_trade": True, "message": "Exit position at <Exit Price>."},
-    "MODIFY_TARGET": {"close_trade": False, "message": "Modify Target to <New Target>."},
-    "MODIFY_SL": {"close_trade": False, "message": "Modify Stop Loss to <New Stop Loss>."},
+    "TARGET_HIT": {"close_trade": True, "message": "Target Achieved! Book Profits at <Exit Price>.", "set": {"exit_price": "<Exit Price>"}},
+    "SL_HIT": {"close_trade": True, "message": "Stop Loss Hit at <Exit Price>. Exit trade.", "set": {"exit_price": "<Exit Price>"}},
+    "PARTIAL_PROFIT": {"close_trade": False, "message": "Book partial profits at <Booking Price>. Trail SL for rest to <New SL>.", "set": {"latest_sl_price": "<New SL>", "booked_price": "<Booking Price>"}},
+    "TRAIL_SL": {"close_trade": False, "message": "Update Stop Loss to <New Stop Loss> to protect profits.", "set": {"latest_sl_price": "<New Stop Loss>"}},
+    "COST_TO_COST": {"close_trade": False, "message": "Trail SL to Cost at <Cost Price>. Hold rest.", "set": {"latest_sl_price": "<Cost Price>"}},
+    "EXIT": {"close_trade": True, "message": "Exit position at <Exit Price>.", "set": {"exit_price": "<Exit Price>"}},
+    "MODIFY_TARGET": {"close_trade": False, "message": "Modify Target to <New Target>.", "set": {"latest_target": "<New Target>"}},
+    "MODIFY_SL": {"close_trade": False, "message": "Modify Stop Loss to <New Stop Loss>.", "set": {"latest_sl_price": "<New Stop Loss>"}},
 }
 UPDATE_TYPES_DICT: dict[str, dict] = get_constant(
     "update_types", _UPDATE_TYPES_FALLBACK,
@@ -57,9 +57,7 @@ EXCHANGE_MAP: dict[str, str] = get_constant("exchange_map", {
 # ── Status Colors ─────────────────────────────────────────
 STATUS_COLORS: dict[str, str] = get_constant("status_colors", {
     "ACTIVE": "#17a2b8",
-    "TARGET_HIT": "#28a745",
-    "SL_HIT": "#dc3545",
-    "EXITED": "gray",
+    "CLOSED": "#6c757d",
 })
 
 # ── Trade Types ───────────────────────────────────────────

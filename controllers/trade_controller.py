@@ -48,7 +48,11 @@ class TradeController:
 
                 async def send_tg():
                     try:
-                        await tg.connect()
+                        authorized = await tg.connect()
+                        if not authorized:
+                            logger.warning("Telegram: user not authorized (OTP required). Skipping send.")
+                            await tg.disconnect()
+                            return "not_authorized"
                         msg = format_new_trade(trade)
                         await tg.send_trade_message(msg, img_path)
                         await tg.disconnect()
@@ -58,7 +62,10 @@ class TradeController:
                         raise
 
                 success = run_async(send_tg())
-                result.telegram_success = bool(success)
+                if success == "not_authorized":
+                    result.telegram_success = "not_authorized"
+                else:
+                    result.telegram_success = bool(success)
             else:
                 result.telegram_success = "not_configured"
         except Exception as e:
@@ -69,6 +76,9 @@ class TradeController:
         return result
 
     def broadcast_update(self, trade: dict, update_data: dict) -> BroadcastResult:
+        if not trade.get("trade_code") or trade["trade_code"] == "?":
+            raise ValueError("Strict Check Failed: trade_code is required to broadcast an update.")
+
         result = BroadcastResult()
         img_path = None
 
@@ -94,6 +104,12 @@ class TradeController:
                     err_msg = gs_result.get("error", "Failed")
                     result.sheets_success = err_msg
                     result.errors.append(f"Google Sheets: {err_msg}")
+
+                # Also append to the Updates sheet
+                try:
+                    gs.append_update_row(update_data)
+                except Exception as ue:
+                    logger.warning(f"Failed to append update row to Updates sheet: {ue}")
             else:
                 result.sheets_success = "not_configured"
         except Exception as e:
@@ -108,7 +124,11 @@ class TradeController:
 
                 async def send_tg():
                     try:
-                        await tg.connect()
+                        authorized = await tg.connect()
+                        if not authorized:
+                            logger.warning("Telegram: user not authorized (OTP required). Skipping send.")
+                            await tg.disconnect()
+                            return "not_authorized"
                         msg = format_trade_update(trade, update_data)
                         await tg.send_update_message(msg, img_path)
                         await tg.disconnect()
@@ -118,7 +138,10 @@ class TradeController:
                         raise
 
                 success = run_async(send_tg())
-                result.telegram_success = bool(success)
+                if success == "not_authorized":
+                    result.telegram_success = "not_authorized"
+                else:
+                    result.telegram_success = bool(success)
             else:
                 result.telegram_success = "not_configured"
         except Exception as e:

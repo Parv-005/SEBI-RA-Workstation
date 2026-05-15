@@ -16,17 +16,28 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+# Column headers for the Updates sheet (mirrors UPDATES_HEADERS in updates_db.py)
+UPDATES_SHEET_HEADERS = [
+    "Trade Code",
+    "Update Type",
+    "Message",
+    "Changes",
+    "Created At",
+]
+
 
 class GoogleSheetsService:
     def __init__(self):
         self.client = None
-        self.sheet = None
+        self.sheet = None          # Trades worksheet
+        self.updates_sheet = None  # Updates worksheet
         self._load_config()
 
     def _load_config(self):
         self.sa_json_path = ""
         self.spreadsheet_id = ""
         self.sheet_name = "Trades"
+        self.updates_sheet_name = "Updates"
         if CONFIG_PATH.exists():
             with open(CONFIG_PATH) as f:
                 config = json.load(f)
@@ -34,6 +45,7 @@ class GoogleSheetsService:
             self.sa_json_path = gs.get("service_account_json", "")
             self.spreadsheet_id = gs.get("spreadsheet_id", "")
             self.sheet_name = gs.get("sheet_name", "Trades")
+            self.updates_sheet_name = gs.get("updates_sheet_name", "Updates")
 
     def is_configured(self) -> bool:
         return bool(
@@ -52,23 +64,35 @@ class GoogleSheetsService:
             )
             self.client = gspread.authorize(creds)
             spreadsheet = self.client.open_by_key(self.spreadsheet_id)
+
+            # ── Trades sheet ──────────────────────────────────────────────────
             try:
                 self.sheet = spreadsheet.worksheet(self.sheet_name)
             except gspread.WorksheetNotFound:
-                logger.info(
-                    f"Worksheet {self.sheet_name} not found. Creating a new one."
-                )
+                logger.info(f"Worksheet '{self.sheet_name}' not found. Creating.")
                 self.sheet = spreadsheet.add_worksheet(
-                    self.sheet_name, rows=1000, cols=26
+                    self.sheet_name, rows=1000, cols=30
                 )
+
+            # ── Updates sheet ─────────────────────────────────────────────────
+            try:
+                self.updates_sheet = spreadsheet.worksheet(self.updates_sheet_name)
+            except gspread.WorksheetNotFound:
+                logger.info(f"Worksheet '{self.updates_sheet_name}' not found. Creating.")
+                self.updates_sheet = spreadsheet.add_worksheet(
+                    self.updates_sheet_name, rows=5000, cols=6
+                )
+                self.updates_sheet.update("A1", [UPDATES_SHEET_HEADERS])
+
         except Exception as e:
             logger.error(f"Failed to connect to Google Sheets: {e}", exc_info=True)
             raise
 
     def _write_header(self):
         from utils.column_mapper import DEFAULT_HEADERS
-
         self.sheet.update("A1", [DEFAULT_HEADERS()])
+
+    # ── Trades sheet operations ───────────────────────────────────────────────
 
     def append_trade(self, trade: dict) -> AppendResult:
         result = AppendResult(success=False)
@@ -88,7 +112,6 @@ class GoogleSheetsService:
             result.unmapped_columns = [h for h in headers if h not in known_labels and h.strip()]
 
             row_num = len(self.sheet.col_values(1)) + 1
-
             row = map_trade_to_columns(
                 trade, headers, is_google_sheets=True, row_num=row_num
             )
@@ -129,19 +152,16 @@ class GoogleSheetsService:
                     pass
 
             if not cell:
-                logger.warning(
-                    f"Trade code {trade_code} not found in Google Sheets for update."
-                )
+                logger.warning(f"Trade code {trade_code} not found in Google Sheets for update.")
                 result["error"] = f"Trade code {trade_code} not found"
                 return result
 
             row_num = cell.row
 
             from utils.column_mapper import get_headers_schema
-
             schema = get_headers_schema()
 
-            METADATA_KEYS = {"update_type", "details", "old_value", "new_value", "_trade_updates"}
+            METADATA_KEYS = {"update_type", "details", "message", "old_value", "new_value", "_trade_updates"}
             trade_keys = {k: v for k, v in update_data.items() if k not in METADATA_KEYS}
             all_update_keys = set(list(trade_keys.keys()) + list((trade_updates or {}).keys()))
 
@@ -153,11 +173,8 @@ class GoogleSheetsService:
                 header_names_to_try = []
                 if schema_entry:
                     header_names_to_try.append(schema_entry.get("label"))
-                    if key == "status":
-                        header_names_to_try.append("Status")
-                    elif key == "remarks":
-                        header_names_to_try.append("Remarks")
 
+                # Fallback label guesses for fields not in schema
                 if key == "reward_pct":
                     header_names_to_try.append("Reward %")
                 elif key == "risk_pct":
@@ -182,9 +199,47 @@ class GoogleSheetsService:
             logger.info(f"Updated trade {trade_code} row in Google Sheets.")
             result["success"] = True
         except Exception as e:
-            logger.error(
-                f"Error updating trade row in Google Sheets: {e}", exc_info=True
+            logger.error(f"Error updating trade row in Google Sheets: {e}", exc_info=True)
+            result["error"] = str(e)
+
+        return result
+
+    # ── Updates sheet operations ──────────────────────────────────────────────
+
+    def append_update_row(self, update_data: dict) -> dict:
+        """Append a single update record to the Updates worksheet."""
+        result = {"success": False, "error": None}
+        try:
+            if not self.updates_sheet:
+                self.connect()
+
+            # Ensure header row exists
+            first_row = self.updates_sheet.row_values(1)
+            if not first_row:
+                self.updates_sheet.update("A1", [UPDATES_SHEET_HEADERS])
+
+            from database.updates_db import format_changes
+            from datetime import datetime
+
+            old_val = update_data.get("old_value")
+            new_val = update_data.get("new_value")
+            changes = format_changes(old_val, new_val)
+
+            row = [
+                update_data.get("trade_code", ""),
+                update_data.get("update_type", ""),
+                update_data.get("message", update_data.get("details", "")),
+                changes,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+            self.updates_sheet.append_row(row, value_input_option="USER_ENTERED")
+            logger.info(
+                f"Appended update row for trade {update_data.get('trade_code')} "
+                f"(type: {update_data.get('update_type')}) to Updates sheet."
             )
+            result["success"] = True
+        except Exception as e:
+            logger.error(f"Error appending update row to Google Sheets: {e}", exc_info=True)
             result["error"] = str(e)
 
         return result

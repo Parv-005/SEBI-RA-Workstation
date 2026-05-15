@@ -50,86 +50,77 @@ def to_display_action(db_action: str) -> str:
     return ACTION_DB_MAP.get(db_action, db_action)
 
 
+# ── Validation behaviour ──────────────────────────────────
+# Set to True to BLOCK submission when close_trade=True and no exit price given.
+# Set to False to only WARN and allow proceeding.
+BLOCK_ON_MISSING_EXIT_PRICE: bool = True
+
+
 def compute_update_fields(
     trade: dict, update_type: str, dynamic_values: dict[str, str], remarks: str
-) -> tuple[dict, dict | None, dict | None]:
-    trade_id = trade.get("id", "?")
-    logger.debug(f"compute_update_fields: trade_id={trade_id}, update_type={update_type}")
-    trade_updates = {}
-    old_value = None
-    new_value = None
+) -> tuple[dict, dict | None, dict | None, dict]:
+    """
+    Fully data-driven computation of trade field updates based on the update_types
+    config (UPDATE_TYPES_DICT). No hardcoded conditions per update_type value.
 
-    if update_type in ("TRAIL_SL", "MODIFY_SL"):
-        new_val_str = dynamic_values.get("New Stop Loss", "")
-        new_sl = float(new_val_str) if new_val_str else None
-        if new_sl is None:
-            raise ValueError("New Stop Loss is required.")
-        old_value = {"stop_loss": trade["stop_loss"]}
-        new_value = {"stop_loss": new_sl}
-        trade_updates["stop_loss"] = new_sl
+    Returns (trade_updates, old_value, new_value, update_data_dict).
+    """
+    from utils.constants import UPDATE_TYPES_DICT
+    from datetime import datetime
 
-    elif update_type == "MODIFY_TARGET":
-        new_val_str = dynamic_values.get("New Target", "")
-        new_tgt = float(new_val_str) if new_val_str else None
-        if new_tgt is None:
-            raise ValueError("New Target is required.")
-        old_value = {"target": trade["target"]}
-        new_value = {"target": new_tgt}
-        trade_updates["target"] = new_tgt
+    trade_code = trade.get("trade_code", "?")
+    logger.debug(f"compute_update_fields: trade_code={trade_code}, update_type={update_type}")
 
-    elif update_type in ("TARGET_HIT", "SL_HIT", "EXIT"):
-        from datetime import datetime
+    update_info = UPDATE_TYPES_DICT.get(update_type, {})
+    close_trade: bool = update_info.get("close_trade", False)
+    set_fields: dict = update_info.get("set", {})
 
-        if update_type == "TARGET_HIT":
-            trade_updates["status"] = "TARGET_HIT"
-        elif update_type == "SL_HIT":
-            trade_updates["status"] = "SL_HIT"
-        elif update_type == "EXIT":
-            trade_updates["status"] = "EXITED"
-            trade_updates["close_narration"] = remarks
+    trade_updates: dict = {}
+    old_value: dict = {}
+    new_value: dict = {}
 
+    # ── Handle trade closure (driven purely by close_trade flag) ──────────────
+    if close_trade:
+        trade_updates["status"] = "CLOSED"
         trade_updates["exit_datetime"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        exit_val_str = dynamic_values.get("Exit Price", "")
-        if exit_val_str:
-            exit_price = float(exit_val_str)
-            new_value = {"exit_price": exit_price}
-            trade_updates["exit_price"] = exit_price
+        trade_updates["close_narration"] = f"[{update_type}] {remarks}"
 
-    elif update_type == "COST_TO_COST":
-        old_value = {"stop_loss": trade["stop_loss"]}
-        new_value = {"stop_loss": trade["entry_price"]}
-        trade_updates["stop_loss"] = trade["entry_price"]
+    # ── Process configured set fields ─────────────────────────────────────────
+    for field, placeholder in set_fields.items():
+        dynamic_key = placeholder.strip("<>")
+        val_str = dynamic_values.get(dynamic_key, "")
+        if val_str:
+            try:
+                val = float(val_str)
+            except ValueError:
+                val = val_str
+            trade_updates[field] = val
+            new_value[field] = val
 
-    elif update_type == "PARTIAL_PROFIT":
-        new_value = {}
-        old_value = {}
-        booked_val_str = dynamic_values.get("Booked Price", "")
-        if booked_val_str:
-            booked_price = float(booked_val_str)
-            new_value["booked_price"] = booked_price
-            trade_updates["booked_price"] = booked_price
-            
-        new_sl_str = dynamic_values.get("New SL", "")
-        if new_sl_str:
-            new_sl = float(new_sl_str)
-            new_value["stop_loss"] = new_sl
-            trade_updates["stop_loss"] = new_sl
-            old_value["stop_loss"] = trade["stop_loss"]
-            
-        if not new_value:
-            new_value = None
-        if not old_value:
-            old_value = None
+            # old_value: prefer the "latest_" variant already stored, fall back
+            # to the original field by stripping the "latest_" prefix and resolving
+            # the canonical field name via LATEST_FIELD_ORIGINALS.
+            old_value[field] = _resolve_old_value(trade, field)
 
-    if update_type in ("TRAIL_SL", "MODIFY_SL", "MODIFY_TARGET", "COST_TO_COST"):
+    # ── Extra Exit Price input when close_trade=True but no exit_price in set ─
+    # (guards future update types that close a trade without an exit_price set field)
+    if close_trade and "exit_price" not in set_fields:
+        extra_exit_str = dynamic_values.get("Exit Price", "")
+        if extra_exit_str:
+            val = float(extra_exit_str)
+            trade_updates["exit_price"] = val
+            new_value["exit_price"] = val
+            old_value["exit_price"] = trade.get("exit_price")
+
+    # ── Recalculate Risk/Reward if SL or target moved ─────────────────────────
+    if "latest_sl_price" in trade_updates or "latest_target" in trade_updates:
         entry = float(trade.get("entry_price", 0) or 0)
-        current_tgt = float(trade.get("target", 0) or 0)
-        current_sl = float(trade.get("stop_loss", 0) or 0)
+        current_tgt = float(trade.get("latest_target") or trade.get("target", 0) or 0)
+        current_sl = float(trade.get("latest_sl_price") or trade.get("stop_loss", 0) or 0)
         action = trade.get("action", "LONG")
 
-        mod_tgt = trade_updates.get("target", current_tgt)
-        mod_sl = trade_updates.get("stop_loss", current_sl)
+        mod_tgt = trade_updates.get("latest_target", current_tgt)
+        mod_sl = trade_updates.get("latest_sl_price", current_sl)
 
         rr = calculate_risk_reward(action, entry, mod_tgt, mod_sl)
         trade_updates["reward"] = rr.reward
@@ -138,14 +129,43 @@ def compute_update_fields(
         trade_updates["risk_pct"] = rr.risk_pct
         trade_updates["risk_reward"] = rr.risk_reward
 
-    update_data_dict = {
+    # ── Normalise empties ─────────────────────────────────────────────────────
+    final_old = old_value if old_value else None
+    final_new = new_value if new_value else None
+
+    if not trade_code or trade_code == "?":
+        raise ValueError("Strict Check Failed: trade_code is missing or invalid.")
+
+    update_data_dict: dict = {
+        "trade_code": trade_code,
         "update_type": update_type,
         "details": remarks,
-        "old_value": old_value,
-        "new_value": new_value,
+        "old_value": final_old,
+        "new_value": final_new,
     }
     for k in ("reward", "risk", "reward_pct", "risk_pct", "risk_reward"):
         if k in trade_updates:
             update_data_dict[k] = trade_updates[k]
 
-    return trade_updates, old_value, new_value, update_data_dict
+    return trade_updates, final_old, final_new, update_data_dict
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# Maps "latest_X" field names to their original counterpart in the trade dict.
+# Extend this dict if new "latest_" fields are added.
+_LATEST_FIELD_ORIGINALS: dict[str, str] = {
+    "latest_sl_price": "stop_loss",
+    "latest_target": "target",
+}
+
+
+def _resolve_old_value(trade: dict, field: str):
+    """Return the existing value for a field, using the original field as fallback for latest_ variants."""
+    current = trade.get(field)
+    if current is not None:
+        return current
+    original = _LATEST_FIELD_ORIGINALS.get(field)
+    if original:
+        return trade.get(original)
+    return None

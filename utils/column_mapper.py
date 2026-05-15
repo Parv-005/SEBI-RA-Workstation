@@ -97,7 +97,7 @@ def map_trade_to_columns(
                 val = trade.get(key, "")
 
                 # special fallback override purely for missing close_narration logic
-                if key == "remarks" and trade.get("status") in ["EXITED", "TARGET_HIT", "SL_HIT"]:
+                if key == "remarks" and trade.get("status") == "CLOSED":
                     if trade.get("close_narration"):
                         val = trade.get("close_narration", "")
                         
@@ -119,9 +119,6 @@ def map_row_to_trade(row_dict: dict) -> dict:
     trade = {}
     schema = get_headers_schema()
 
-    if "id" in row_dict:
-        trade["id"] = row_dict["id"]
-
     for header, value in row_dict.items():
         schema_entry = next((item for item in schema if item.get("label") == header), None)
 
@@ -142,8 +139,6 @@ def map_row_to_trade(row_dict: dict) -> dict:
                 trade[key] = value
                 
             # If the user renamed the Status column but it corresponds to `status`, it will be dynamically mapped.
-        elif header and header.lower() == "id":
-            trade["id"] = value
         elif header:
             # Fallback
             internal_key = header.lower().replace(" ", "_").replace(":", "_")
