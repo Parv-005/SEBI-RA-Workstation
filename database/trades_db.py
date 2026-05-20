@@ -1,5 +1,8 @@
 from core.paths import DATA_DIR, TRADES_PATH
-from database.db_helpers import _ensure_data_dir, _load_wb, _save_workbook, _wb_to_dicts
+from database.db_helpers import (
+    _ensure_data_dir, _load_wb, _save_workbook, _wb_to_dicts,
+    _get_cached_rows, invalidate_cache,
+)
 from utils.column_mapper import DEFAULT_HEADERS, map_row_to_trade, map_trade_to_columns
 from utils.logger import setup_logger
 from openpyxl import load_workbook
@@ -37,6 +40,7 @@ def insert_trade(trade_data: dict) -> tuple[str, dict]:
         row = map_trade_to_columns(enriched, headers, is_google_sheets=False)
         ws.append(row)
         _save_workbook(wb, TRADES_PATH)
+        invalidate_cache("trades")
 
         logger.info(f"Inserted trade code {trade_code} ({enriched.get('stock_name')})")
         return trade_code, enriched
@@ -47,9 +51,8 @@ def insert_trade(trade_data: dict) -> tuple[str, dict]:
 
 def get_trade(trade_code: str) -> dict | None:
     try:
-        wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
-        ws = wb.active
-        for row in _wb_to_dicts(ws, TRADES_HEADERS, is_trades=True):
+        rows = _get_cached_rows(TRADES_PATH, TRADES_HEADERS, is_trades=True)
+        for row in rows:
             if row.get("trade_code") == trade_code:
                 return row
         return None
@@ -60,9 +63,7 @@ def get_trade(trade_code: str) -> dict | None:
 
 def get_all_trades(filters: dict | None = None) -> list[dict]:
     try:
-        wb = _load_wb(TRADES_PATH, TRADES_HEADERS)
-        ws = wb.active
-        rows = _wb_to_dicts(ws, TRADES_HEADERS, is_trades=True)
+        rows = _get_cached_rows(TRADES_PATH, TRADES_HEADERS, is_trades=True)
 
         if filters:
             if filters.get("status"):
@@ -113,6 +114,7 @@ def update_trade(trade_code: str, fields: dict) -> bool:
 
         if updated:
             _save_workbook(wb, TRADES_PATH)
+            invalidate_cache("trades")
             logger.info(f"Updated trade code {trade_code} with {fields}")
         return updated
     except Exception as e:

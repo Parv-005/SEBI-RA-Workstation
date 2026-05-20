@@ -1,7 +1,3 @@
-import threading
-from services.image_generator import ImageGenerator
-from services.telegram_service import TelegramService
-from services.google_sheets_service import GoogleSheetsService
 from services.results import BroadcastResult
 from utils.async_helper import run_async
 from utils.logger import setup_logger
@@ -11,6 +7,10 @@ logger = setup_logger("TradeController")
 
 class TradeController:
     def broadcast_new_trade(self, trade: dict) -> BroadcastResult:
+        from services.image_generator import ImageGenerator
+        from services.telegram_service import TelegramService
+        from services.google_sheets_service import GoogleSheetsService
+
         result = BroadcastResult()
         img_path = None
 
@@ -76,6 +76,10 @@ class TradeController:
         return result
 
     def broadcast_update(self, trade: dict, update_data: dict) -> BroadcastResult:
+        from services.image_generator import ImageGenerator
+        from services.telegram_service import TelegramService
+        from services.google_sheets_service import GoogleSheetsService
+
         if not trade.get("trade_code") or trade["trade_code"] == "?":
             raise ValueError("Strict Check Failed: trade_code is required to broadcast an update.")
 
@@ -105,7 +109,6 @@ class TradeController:
                     result.sheets_success = err_msg
                     result.errors.append(f"Google Sheets: {err_msg}")
 
-                # Also append to the Updates sheet
                 try:
                     gs.append_update_row(update_data)
                 except Exception as ue:

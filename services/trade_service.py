@@ -112,23 +112,6 @@ def compute_update_fields(
             new_value["exit_price"] = val
             old_value["exit_price"] = trade.get("exit_price")
 
-    # ── Recalculate Risk/Reward if SL or target moved ─────────────────────────
-    if "latest_sl_price" in trade_updates or "latest_target" in trade_updates:
-        entry = float(trade.get("entry_price", 0) or 0)
-        current_tgt = float(trade.get("latest_target") or trade.get("target", 0) or 0)
-        current_sl = float(trade.get("latest_sl_price") or trade.get("stop_loss", 0) or 0)
-        action = trade.get("action", "LONG")
-
-        mod_tgt = trade_updates.get("latest_target", current_tgt)
-        mod_sl = trade_updates.get("latest_sl_price", current_sl)
-
-        rr = calculate_risk_reward(action, entry, mod_tgt, mod_sl)
-        trade_updates["reward"] = rr.reward
-        trade_updates["risk"] = rr.risk
-        trade_updates["reward_pct"] = rr.reward_pct
-        trade_updates["risk_pct"] = rr.risk_pct
-        trade_updates["risk_reward"] = rr.risk_reward
-
     # ── Normalise empties ─────────────────────────────────────────────────────
     final_old = old_value if old_value else None
     final_new = new_value if new_value else None
@@ -143,10 +126,6 @@ def compute_update_fields(
         "old_value": final_old,
         "new_value": final_new,
     }
-    for k in ("reward", "risk", "reward_pct", "risk_pct", "risk_reward"):
-        if k in trade_updates:
-            update_data_dict[k] = trade_updates[k]
-
     return trade_updates, final_old, final_new, update_data_dict
 
 

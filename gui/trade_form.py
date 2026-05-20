@@ -7,11 +7,17 @@ from utils.logger import setup_logger
 from utils.constants import SEGMENTS, ACTION_DISPLAY, TRADE_TYPES, ACTION_COLORS
 from services.trade_service import calculate_risk_reward, to_db_action
 from services.results import BroadcastResult
-from controllers.trade_controller import TradeController
 
 logger = setup_logger("TradeForm")
 
-controller = TradeController()
+_controller = None
+
+def _get_controller():
+    global _controller
+    if _controller is None:
+        from controllers.trade_controller import TradeController
+        _controller = TradeController()
+    return _controller
 
 
 def _section_label(parent, text, row, col=0, colspan=4, pady_top=20):
@@ -490,7 +496,7 @@ class TradeForm(ctk.CTkFrame):
             trade_id, trade_data = insert_trade(trade_data)
 
             def process_services():
-                result = controller.broadcast_new_trade(trade_data)
+                result = _get_controller().broadcast_new_trade(trade_data)
                 self.after(0, self._on_submit_complete, trade_data.get("trade_code", str(trade_id)), result)
 
             threading.Thread(target=process_services, daemon=True).start()
@@ -541,6 +547,7 @@ class TradeForm(ctk.CTkFrame):
 
         self.clear_form()
         self.submit_btn.configure(text="✦  Submit Trade & Broadcast", state="normal")
+        self.master._trade_list_dirty = True
         self.master.show_active_trades()
 
     def clear_form(self):

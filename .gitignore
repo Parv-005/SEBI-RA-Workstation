@@ -34,3 +34,5 @@ opencode.json
 .env
 rough.py
 .ruff_cache/
+image_generation_rough.py
+.opencode/

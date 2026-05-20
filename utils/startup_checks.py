@@ -1,8 +1,7 @@
 import sys
 import json
-import tkinter.messagebox as messagebox
-# pyrefly: ignore [missing-import]
-import customtkinter as ctk
+import tkinter as tk
+from tkinter import messagebox
 from core.paths import DATA_DIR, CONSTANTS_PATH
 
 _DEFAULT_CONSTANTS = {
@@ -136,7 +135,7 @@ _DEFAULT_CONSTANTS = {
 
 def check_constants_file():
     if not CONSTANTS_PATH.exists():
-        root = ctk.CTk()
+        root = tk.Tk()
         root.withdraw()
         ans = messagebox.askyesno(
             "Missing Configuration",

@@ -9,12 +9,18 @@ import threading
 import re
 from services.trade_service import compute_update_fields, BLOCK_ON_MISSING_EXIT_PRICE
 from utils.constants import UPDATE_TYPES, UPDATE_TYPES_DICT
-from controllers.trade_controller import TradeController
 from services.results import BroadcastResult
 
 logger = setup_logger("UpdateForm")
 
-controller = TradeController()
+_controller = None
+
+def _get_controller():
+    global _controller
+    if _controller is None:
+        from controllers.trade_controller import TradeController
+        _controller = TradeController()
+    return _controller
 
 
 class UpdateForm(ctk.CTkToplevel):
@@ -240,7 +246,7 @@ class UpdateForm(ctk.CTkToplevel):
             update_data_dict["_trade_updates"] = trade_updates
 
             def process_update():
-                result = controller.broadcast_update(self.trade, update_data_dict)
+                result = _get_controller().broadcast_update(self.trade, update_data_dict)
                 self.after(0, self._on_update_complete, result)
 
             threading.Thread(target=process_update, daemon=True).start()

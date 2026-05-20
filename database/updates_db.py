@@ -1,7 +1,10 @@
 import json
 from datetime import datetime
 from core.paths import DATA_DIR, UPDATES_PATH
-from database.db_helpers import _ensure_data_dir, _load_wb, _save_workbook, _wb_to_dicts
+from database.db_helpers import (
+    _ensure_data_dir, _load_wb, _save_workbook, _wb_to_dicts,
+    _get_cached_rows, invalidate_cache,
+)
 from utils.logger import setup_logger
 
 logger = setup_logger("UpdatesDB")
@@ -82,6 +85,7 @@ def insert_trade_update(update_data: dict) -> None:
         ]
         ws.append(row)
         _save_workbook(wb, UPDATES_PATH)
+        invalidate_cache("updates")
 
         logger.info(
             f"Inserted trade update for trade code {update_data['trade_code']} "
@@ -95,9 +99,7 @@ def insert_trade_update(update_data: dict) -> None:
 def get_trade_updates(trade_code: str) -> list[dict]:
     """Return all updates for a trade, sorted latest-first."""
     try:
-        wb = _load_wb(UPDATES_PATH, UPDATES_HEADERS)
-        ws = wb.active
-        rows = _wb_to_dicts(ws, UPDATES_HEADERS, is_trades=False)
+        rows = _get_cached_rows(UPDATES_PATH, UPDATES_HEADERS, is_trades=False)
         filtered = [r for r in rows if r.get("trade_code") == trade_code]
         filtered.sort(key=lambda r: r.get("created_at") or "", reverse=True)
         return filtered

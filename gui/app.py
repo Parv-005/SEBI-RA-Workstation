@@ -1,15 +1,11 @@
 import customtkinter as ctk
-import os
-import sys
-
-from gui.trade_form import TradeForm
-from gui.trade_list import TradeList
 from utils.logger import setup_logger
 
 logger = setup_logger("App")
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
 
 class App(ctk.CTk):
     def __init__(self):
@@ -19,11 +15,9 @@ class App(ctk.CTk):
         self.geometry("1100x700")
         self.minsize(900, 600)
 
-        # Configure grid layout (1x2)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # Create sidebar frame
         self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
@@ -34,7 +28,6 @@ class App(ctk.CTk):
         )
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 30))
 
-        # Sidebar Buttons
         self.new_trade_btn = ctk.CTkButton(
             self.sidebar_frame, text="New Trade", command=self.show_new_trade
         )
@@ -58,35 +51,76 @@ class App(ctk.CTk):
         )
         self.appearance_mode_optionemenu.grid(row=6, column=0, padx=20, pady=(10, 20))
 
-        # Create main content frames
         self.frames = {}
+        self._trade_detail_frame = None
+        self._trade_list_dirty = True
+        self._trade_list_after_id = None
 
-        self.frames["new_trade"] = TradeForm(self)
-        self.frames["active_trades"] = TradeList(self)
+        self.after(0, self._startup_show_new_trade)
 
-        # Placeholder for settings
-        from gui.settings_page import SettingsPage
-        self.frames["settings"] = SettingsPage(self)
+    def _ensure_frame(self, key, cls):
+        if key not in self.frames or self.frames[key] is None:
+            self.frames[key] = cls(self)
+        return self.frames[key]
 
-        # Show default frame
+    def _startup_show_new_trade(self):
         self.show_new_trade()
 
     def change_appearance_mode_event(self, new_appearance_mode: str):
         ctk.set_appearance_mode(new_appearance_mode)
+        for frame in self.frames.values():
+            if frame is not None and hasattr(frame, 'update_theme'):
+                frame.update_theme()
 
     def hide_all_frames(self):
         for frame in self.frames.values():
-            frame.grid_forget()
+            if frame is not None:
+                frame.grid_forget()
+        if self._trade_detail_frame is not None:
+            self._trade_detail_frame.grid_forget()
+            self._trade_detail_frame.destroy()
+            self._trade_detail_frame = None
 
     def show_new_trade(self):
         self.hide_all_frames()
-        self.frames["new_trade"].grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        frame = self._ensure_frame("new_trade", self._import_trade_form)
+        frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+
+    def _import_trade_form(self, master):
+        from gui.trade_form import TradeForm
+        return TradeForm(master)
 
     def show_active_trades(self):
         self.hide_all_frames()
-        self.frames["active_trades"].refresh_data()
-        self.frames["active_trades"].grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        frame = self._ensure_frame("active_trades", self._import_trade_list)
+        frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        if self._trade_list_dirty:
+            if self._trade_list_after_id is not None:
+                self.after_cancel(self._trade_list_after_id)
+            self._trade_list_after_id = self.after(50, self._refresh_trade_list)
+
+    def _import_trade_list(self, master):
+        from gui.trade_list import TradeList
+        return TradeList(master)
+
+    def _refresh_trade_list(self):
+        self._trade_list_after_id = None
+        frame = self.frames.get("active_trades")
+        if frame is not None:
+            frame.refresh_data()
+        self._trade_list_dirty = False
+
+    def show_trade_detail(self, trade: dict):
+        self.hide_all_frames()
+        from gui.trade_detail import TradeDetail
+        self._trade_detail_frame = TradeDetail(self, trade)
+        self._trade_detail_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
     def show_settings(self):
         self.hide_all_frames()
-        self.frames["settings"].grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        frame = self._ensure_frame("settings", self._import_settings_page)
+        frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+
+    def _import_settings_page(self, master):
+        from gui.settings_page import SettingsPage
+        return SettingsPage(master)

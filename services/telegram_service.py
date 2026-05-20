@@ -2,8 +2,10 @@ import json
 import os
 
 
+# pyrefly: ignore [missing-import]
 from telethon import TelegramClient
 
+# pyrefly: ignore [missing-import]
 from telethon.errors import SessionPasswordNeededError
 from core.paths import CONFIG_PATH, TELEGRAM_SESSION_DIR
 from utils.logger import setup_logger
