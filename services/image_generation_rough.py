@@ -296,7 +296,7 @@ class PSDImageGenerator:
 
             # Step 4 — re-open and composite
             psd_modified = PSDImage.open(tmp_path)
-            rendered: Image.Image = psd_modified.composite()
+            rendered: Image.Image = psd_modified.composite(ignore_preview=True)
             logger.debug("Composite rendering complete.")
 
             # Step 5 — save PNG
