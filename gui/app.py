@@ -35,7 +35,8 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         central = QWidget()
         central.setObjectName("central")
-        central.setStyleSheet("background-color: transparent;")
+        central.setObjectName("central_widget")
+        central.setStyleSheet("#central_widget { background-color: transparent; }")
         self.setCentralWidget(central)
 
         main_layout = QHBoxLayout(central)
@@ -47,13 +48,15 @@ class MainWindow(QMainWindow):
 
         content_container = QWidget()
         content_container.setObjectName("content_container")
-        content_container.setStyleSheet("background-color: transparent;")
+        content_container.setObjectName("content_area")
+        content_container.setStyleSheet("#content_area { background-color: transparent; }")
         content_layout = QHBoxLayout(content_container)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
 
         self.stack = QStackedWidget()
-        self.stack.setStyleSheet("background-color: transparent;")
+        self.stack.setObjectName("page_stack")
+        self.stack.setStyleSheet("#page_stack { background-color: transparent; }")
         content_layout.addWidget(self.stack, 1)
 
         self.toast_overlay = ToastManager(content_container)

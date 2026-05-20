@@ -33,7 +33,8 @@ class SectionCard(QFrame):
             self._layout.addWidget(separator)
 
         self._content = QWidget()
-        self._content.setStyleSheet("background-color: transparent;")
+        self._content.setObjectName("card_content")
+        self._content.setStyleSheet("#card_content { background-color: transparent; }")
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(0, 4, 0, 0)
         self._content_layout.setSpacing(6)

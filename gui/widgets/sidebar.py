@@ -50,7 +50,7 @@ class Sidebar(QFrame):
 
         nav_container = QWidget()
         nav_container.setObjectName("nav_container")
-        nav_container.setStyleSheet("background-color: transparent;")
+        nav_container.setStyleSheet("#nav_container { background-color: transparent; }")
         nav_layout = QVBoxLayout(nav_container)
         nav_layout.setContentsMargins(0, 0, 0, 0)
         nav_layout.setSpacing(2)
@@ -70,7 +70,7 @@ class Sidebar(QFrame):
 
         theme_container = QWidget()
         theme_container.setObjectName("theme_container")
-        theme_container.setStyleSheet("background-color: transparent;")
+        theme_container.setStyleSheet("#theme_container { background-color: transparent; }")
         theme_layout = QVBoxLayout(theme_container)
         theme_layout.setContentsMargins(0, 10, 0, 0)
         theme_layout.setSpacing(6)

@@ -20,7 +20,7 @@ DARK_COLORS = {
     "border": "#2C2C3A",
     "border_focus": "#D4AF37",
     "input_bg": "#1A1A24",
-    "input_border": "#4A4A5A",
+    "input_border": "#6A6A7A",
     "input_border_focus": "#D4AF37",
     "disabled_bg": "#1A1A24",
     "disabled_text": "#4A4A5A",
@@ -271,13 +271,7 @@ QComboBox::drop-down {{
     padding-right: 8px;
 }}
 
-QComboBox::down-arrow {{
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid {c['text_secondary']};
-    width: 0px;
-    height: 0px;
-}}
+
 
 QComboBox QAbstractItemView {{
     background-color: {c['surface']};

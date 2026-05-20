@@ -96,7 +96,8 @@ class UpdateDialog(QDialog):
         layout.addWidget(self._close_trade_cb)
 
         self._dynamic_fields_widget = QWidget()
-        self._dynamic_fields_widget.setStyleSheet("background-color: transparent;")
+        self._dynamic_fields_widget.setObjectName("dynamic_fields")
+        self._dynamic_fields_widget.setStyleSheet("#dynamic_fields { background-color: transparent; }")
         self._dynamic_fields_layout = QVBoxLayout(self._dynamic_fields_widget)
         self._dynamic_fields_layout.setContentsMargins(0, 8, 0, 8)
         self._dynamic_fields_layout.setSpacing(8)
@@ -177,7 +178,8 @@ class UpdateDialog(QDialog):
             self._dynamic_inputs[ph] = entry
 
             container = QWidget()
-            container.setStyleSheet("background-color: transparent;")
+            container.setObjectName("dyn_field_row")
+            container.setStyleSheet("#dyn_field_row { background-color: transparent; }")
             container.setLayout(row)
             self._dynamic_fields_layout.addWidget(container)
 
@@ -205,7 +207,8 @@ class UpdateDialog(QDialog):
             self._dynamic_inputs["Exit Price"] = self._extra_exit_entry
 
             container = QWidget()
-            container.setStyleSheet("background-color: transparent;")
+            container.setObjectName("dyn_field_row_exit")
+            container.setStyleSheet("#dyn_field_row_exit { background-color: transparent; }")
             container.setLayout(row)
             self._dynamic_fields_layout.addWidget(container)
 

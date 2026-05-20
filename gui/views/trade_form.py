@@ -38,10 +38,12 @@ class NewTradeView(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background-color: transparent; border: none;")
+        scroll.setObjectName("form_scroll")
+        scroll.setStyleSheet("#form_scroll { background-color: transparent; border: none; }")
 
         scroll_content = QWidget()
-        scroll_content.setStyleSheet("background-color: transparent;")
+        scroll_content.setObjectName("form_content")
+        scroll_content.setStyleSheet("#form_content { background-color: transparent; }")
         form_layout = QVBoxLayout(scroll_content)
         form_layout.setContentsMargins(40, 32, 40, 32)
         form_layout.setSpacing(16)
@@ -69,35 +71,34 @@ class NewTradeView(QWidget):
         self._build_notes_section()
         form_layout.addWidget(self._notes_card)
 
-        form_layout.addSpacing(24)
-
-        sep = QFrame()
-        sep.setFixedHeight(1)
-        sep.setStyleSheet(
-            f"background-color: {get_color('border')}; border: none;"
-        )
-        form_layout.addWidget(sep)
-
-        form_layout.addSpacing(16)
-
-        submit_layout = QHBoxLayout()
-        submit_layout.setContentsMargins(0, 0, 0, 0)
-        submit_layout.addStretch()
-
-        self._submit_btn = QPushButton("Submit Trade & Broadcast")
-        self._submit_btn.setObjectName("gold")
-        self._submit_btn.setMinimumHeight(52)
-        self._submit_btn.setMinimumWidth(320)
-        self._submit_btn.setFont(QFont("Segoe UI", 15, QFont.Bold))
-        self._submit_btn.setCursor(Qt.PointingHandCursor)
-        self._submit_btn.clicked.connect(self._on_submit)
-        submit_layout.addWidget(self._submit_btn)
-
-        form_layout.addLayout(submit_layout)
         form_layout.addStretch()
 
         scroll.setWidget(scroll_content)
         outer_layout.addWidget(scroll, 1)
+
+        # Fixed footer — always visible, outside scroll area
+        footer = QFrame()
+        footer.setStyleSheet(
+            f"background-color: {get_color('surface')}; "
+            f"border-top: 1px solid {get_color('border')};"
+        )
+        footer.setMinimumHeight(72)
+        footer.setMaximumHeight(72)
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(40, 0, 40, 0)
+        footer_layout.setSpacing(0)
+        footer_layout.addStretch()
+
+        self._submit_btn = QPushButton("Submit Trade & Broadcast")
+        self._submit_btn.setObjectName("gold")
+        self._submit_btn.setMinimumHeight(48)
+        self._submit_btn.setMinimumWidth(280)
+        self._submit_btn.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        self._submit_btn.setCursor(Qt.PointingHandCursor)
+        self._submit_btn.clicked.connect(self._on_submit)
+        footer_layout.addWidget(self._submit_btn)
+
+        outer_layout.addWidget(footer)
 
     def _make_label(self, text, bold=True, size=11):
         lbl = QLabel(text)
