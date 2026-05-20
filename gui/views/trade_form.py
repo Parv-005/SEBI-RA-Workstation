@@ -2,10 +2,10 @@ import re
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QComboBox, QTextEdit, QScrollArea, QFrame,
-    QFormLayout, QMessageBox
+    QGridLayout, QMessageBox, QSizePolicy
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QDoubleValidator, QIntValidator
+from PySide6.QtGui import QFont
 
 from gui.signals import get_signals
 from gui.theme import get_color
@@ -13,6 +13,9 @@ from gui.widgets.toast import ToastWidget
 from gui.widgets.section_card import SectionCard
 from services.trade_service import calculate_risk_reward, to_db_action, to_display_action
 from utils.constants import SEGMENTS, ACTION_DISPLAY, ACTION_COLORS, TRADE_TYPES
+
+_GOLD = "#D4AF37"
+_GOLD_HOVER = "#E6C24F"
 
 
 class NewTradeView(QWidget):
@@ -40,12 +43,14 @@ class NewTradeView(QWidget):
         scroll_content = QWidget()
         scroll_content.setStyleSheet("background-color: transparent;")
         form_layout = QVBoxLayout(scroll_content)
-        form_layout.setContentsMargins(32, 24, 32, 24)
-        form_layout.setSpacing(20)
+        form_layout.setContentsMargins(40, 32, 40, 32)
+        form_layout.setSpacing(16)
 
         title = QLabel("New Trade Entry")
-        title.setFont(QFont("Segoe UI", 24, QFont.Bold))
-        title.setStyleSheet(f"color: {get_color('text_primary')}; background: transparent;")
+        title.setFont(QFont("Segoe UI", 26, QFont.Bold))
+        title.setStyleSheet(
+            f"color: {get_color('accent')}; background: transparent; border: none;"
+        )
         form_layout.addWidget(title)
 
         self._identity_card = SectionCard("Trade Identity")
@@ -69,10 +74,10 @@ class NewTradeView(QWidget):
         submit_layout.addStretch()
 
         self._submit_btn = QPushButton("Submit Trade & Broadcast")
-        self._submit_btn.setObjectName("success")
-        self._submit_btn.setMinimumHeight(48)
-        self._submit_btn.setMinimumWidth(280)
-        self._submit_btn.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        self._submit_btn.setObjectName("gold")
+        self._submit_btn.setMinimumHeight(52)
+        self._submit_btn.setMinimumWidth(320)
+        self._submit_btn.setFont(QFont("Segoe UI", 15, QFont.Bold))
         self._submit_btn.setCursor(Qt.PointingHandCursor)
         self._submit_btn.clicked.connect(self._on_submit)
         submit_layout.addWidget(self._submit_btn)
@@ -83,231 +88,198 @@ class NewTradeView(QWidget):
         scroll.setWidget(scroll_content)
         outer_layout.addWidget(scroll, 1)
 
-    def _add_field_row(self, card, label_text, widget, label_width=130):
-        row = QHBoxLayout()
-        row.setSpacing(12)
-        label = QLabel(label_text)
-        label.setFixedWidth(label_width)
-        label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 13px; "
-            f"font-weight: 500; background: transparent;"
+    def _make_label(self, text, bold=True, size=11):
+        lbl = QLabel(text)
+        lbl.setFont(QFont("Segoe UI", size, QFont.Bold if bold else QFont.Normal))
+        lbl.setStyleSheet(
+            f"color: {get_color('text_muted')}; background: transparent; border: none; "
+            f"letter-spacing: 0.3px;"
         )
-        row.addWidget(label)
-        row.addWidget(widget, 1)
-        card.add_layout(row)
+        return lbl
+
+    def _make_input(self, placeholder=""):
+        edit = QLineEdit()
+        edit.setPlaceholderText(placeholder)
+        return edit
+
+    def _make_combo(self, items):
+        combo = QComboBox()
+        combo.addItems(items)
+        return combo
 
     def _build_identity_section(self):
-        self._segment_combo = QComboBox()
-        self._segment_combo.addItems(SEGMENTS)
-        self._add_field_row(self._identity_card, "Segment:", self._segment_combo)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(10)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
 
-        action_row = QHBoxLayout()
-        action_row.setSpacing(12)
+        row = 0
 
-        action_label = QLabel("Action:")
-        action_label.setFixedWidth(130)
-        action_label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 13px; "
-            f"font-weight: 500; background: transparent;"
-        )
-        action_row.addWidget(action_label)
+        seg_label = self._make_label("Segment")
+        grid.addWidget(seg_label, row, 0)
+        self._segment_combo = self._make_combo(SEGMENTS)
+        grid.addWidget(self._segment_combo, row, 1)
 
-        self._action_combo = QComboBox()
-        self._action_combo.addItems(ACTION_DISPLAY)
+        action_label = self._make_label("Action")
+        grid.addWidget(action_label, row, 2)
+        self._action_combo = self._make_combo(ACTION_DISPLAY)
         self._action_combo.currentTextChanged.connect(self._on_action_change)
-        action_row.addWidget(self._action_combo, 1)
+        grid.addWidget(self._action_combo, row, 3)
 
-        stock_label = QLabel("Stock / Symbol:")
-        stock_label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 13px; "
-            f"font-weight: 500; background: transparent;"
-        )
-        stock_label.setFixedWidth(100)
-        action_row.addWidget(stock_label)
+        row += 1
 
-        self._stock_entry = QLineEdit()
-        self._stock_entry.setPlaceholderText("e.g. RELIANCE, BANKNIFTY")
-        action_row.addWidget(self._stock_entry, 1)
+        stock_label = self._make_label("Stock / Symbol")
+        grid.addWidget(stock_label, row, 0)
+        self._stock_entry = self._make_input("e.g. RELIANCE, BANKNIFTY")
+        grid.addWidget(self._stock_entry, row, 1, 1, 2)
 
         self._fetch_cmp_btn = QPushButton("Fetch CMP")
-        self._fetch_cmp_btn.setObjectName("ghost")
+        self._fetch_cmp_btn.setObjectName("gold")
+        self._fetch_cmp_btn.setMinimumWidth(110)
         self._fetch_cmp_btn.setCursor(Qt.PointingHandCursor)
         self._fetch_cmp_btn.clicked.connect(self._on_fetch_cmp)
-        action_row.addWidget(self._fetch_cmp_btn)
+        grid.addWidget(self._fetch_cmp_btn, row, 3)
 
-        self._identity_card.add_layout(action_row)
+        row += 1
+
+        type_label = self._make_label("Trade Type")
+        grid.addWidget(type_label, row, 0)
+        self._trade_type_combo = self._make_combo(TRADE_TYPES)
+        grid.addWidget(self._trade_type_combo, row, 1)
+
+        time_label = self._make_label("Approx Time")
+        grid.addWidget(time_label, row, 2)
+        self._approx_time_entry = self._make_input("e.g. 2-3 days, 1 week")
+        grid.addWidget(self._approx_time_entry, row, 3)
 
         self._on_action_change(ACTION_DISPLAY[0])
-
-        type_row = QHBoxLayout()
-        type_row.setSpacing(12)
-
-        type_label = QLabel("Trade Type:")
-        type_label.setFixedWidth(130)
-        type_label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 13px; "
-            f"font-weight: 500; background: transparent;"
-        )
-        type_row.addWidget(type_label)
-
-        self._trade_type_combo = QComboBox()
-        self._trade_type_combo.addItems(TRADE_TYPES)
-        type_row.addWidget(self._trade_type_combo, 1)
-
-        time_label = QLabel("Approx Time:")
-        time_label.setFixedWidth(100)
-        time_label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 13px; "
-            f"font-weight: 500; background: transparent;"
-        )
-        type_row.addWidget(time_label)
-
-        self._approx_time_entry = QLineEdit()
-        self._approx_time_entry.setPlaceholderText("e.g. 2-3 days, 1 week")
-        type_row.addWidget(self._approx_time_entry, 1)
-
-        self._identity_card.add_layout(type_row)
+        self._identity_card.add_layout(grid)
 
     def _on_action_change(self, action):
-        action_color = ACTION_COLORS.get(action, "#28a745")
+        action_color = ACTION_COLORS.get(action, "#4CAF50")
         self._action_combo.setStyleSheet(f"""
         QComboBox {{
             color: {action_color};
             font-weight: 700;
+            border: 1px solid {get_color('input_border')};
+            border-radius: 6px;
+            padding: 8px 12px;
+            min-height: 20px;
         }}
-        QComboBox QAbstractItemView::item {{
+        QComboBox:focus {{
+            border: 2px solid {get_color('input_border_focus')};
+            padding: 7px 11px;
+        }}
+        QComboBox QAbstractItemView {{
             padding: 6px 12px;
         }}
         """)
 
     def _build_prices_section(self):
-        grid_card = QWidget()
-        grid_card.setStyleSheet("background-color: transparent;")
-        grid_layout = QHBoxLayout(grid_card)
-        grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.setSpacing(24)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(10)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
 
-        left = QWidget()
-        left.setStyleSheet("background-color: transparent;")
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(8)
+        row = 0
 
-        right = QWidget()
-        right.setStyleSheet("background-color: transparent;")
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(8)
-
-        self._entry_price = QLineEdit()
-        self._entry_price.setPlaceholderText("0.00")
+        entry_label = self._make_label("Entry Price")
+        grid.addWidget(entry_label, row, 0)
+        self._entry_price = self._make_input("0.00")
         self._entry_price.textChanged.connect(self._on_rr_input_change)
-        self._add_price_row(left_layout, "Entry Price:", self._entry_price)
+        grid.addWidget(self._entry_price, row, 1)
 
-        self._target_price = QLineEdit()
-        self._target_price.setPlaceholderText("0.00")
+        target_label = self._make_label("Target Price")
+        grid.addWidget(target_label, row, 2)
+        self._target_price = self._make_input("0.00")
         self._target_price.textChanged.connect(self._on_rr_input_change)
-        self._add_price_row(right_layout, "Target Price:", self._target_price)
+        grid.addWidget(self._target_price, row, 3)
 
-        self._zone_start = QLineEdit()
-        self._zone_start.setPlaceholderText("Lower bound")
+        row += 1
+
+        zone_start_label = self._make_label("Zone Start")
+        grid.addWidget(zone_start_label, row, 0)
+        self._zone_start = self._make_input("Lower bound or +50/-5%")
         self._zone_start.editingFinished.connect(self._apply_zone_offsets)
-        self._add_price_row(left_layout, "Zone Start:", self._zone_start)
+        grid.addWidget(self._zone_start, row, 1)
 
-        self._zone_end = QLineEdit()
-        self._zone_end.setPlaceholderText("Upper bound")
+        zone_end_label = self._make_label("Zone End")
+        grid.addWidget(zone_end_label, row, 2)
+        self._zone_end = self._make_input("Upper bound or +100")
         self._zone_end.editingFinished.connect(self._apply_zone_offsets)
-        self._add_price_row(right_layout, "Zone End:", self._zone_end)
+        grid.addWidget(self._zone_end, row, 3)
 
-        self._stop_loss = QLineEdit()
-        self._stop_loss.setPlaceholderText("0.00")
+        row += 1
+
+        sl_label = self._make_label("Stop Loss")
+        grid.addWidget(sl_label, row, 0)
+        self._stop_loss = self._make_input("0.00")
         self._stop_loss.textChanged.connect(self._on_rr_input_change)
-        self._add_price_row(left_layout, "Stop Loss:", self._stop_loss)
+        grid.addWidget(self._stop_loss, row, 1)
 
-        grid_layout.addWidget(left, 1)
-        grid_layout.addWidget(right, 1)
-        self._prices_card.add_widget(grid_card)
-
-    def _add_price_row(self, parent, label_text, edit):
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        label = QLabel(label_text)
-        label.setFixedWidth(100)
-        label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 13px; "
-            f"font-weight: 500; background: transparent;"
-        )
-        row.addWidget(label)
-        row.addWidget(edit, 1)
-
-        container = QWidget()
-        container.setStyleSheet("background-color: transparent;")
-        container.setLayout(row)
-        parent.addWidget(container)
+        self._prices_card.add_layout(grid)
 
     def _build_risk_section(self):
-        grid_card = QWidget()
-        grid_card.setStyleSheet("background-color: transparent;")
-        grid_layout = QHBoxLayout(grid_card)
-        grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.setSpacing(24)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(10)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
 
-        left = QWidget()
-        left.setStyleSheet("background-color: transparent;")
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(8)
+        row = 0
 
-        right = QWidget()
-        right.setStyleSheet("background-color: transparent;")
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(8)
-
+        reward_label = self._make_label("Reward")
+        grid.addWidget(reward_label, row, 0)
         self._reward_display = self._make_readonly_field()
-        self._add_price_row(left_layout, "Reward:", self._reward_display)
+        grid.addWidget(self._reward_display, row, 1)
 
+        risk_label = self._make_label("Risk")
+        grid.addWidget(risk_label, row, 2)
         self._risk_display = self._make_readonly_field()
-        self._add_price_row(right_layout, "Risk:", self._risk_display)
+        grid.addWidget(self._risk_display, row, 3)
 
+        row += 1
+
+        reward_pct_label = self._make_label("Reward %")
+        grid.addWidget(reward_pct_label, row, 0)
         self._reward_pct_display = self._make_readonly_field()
-        self._add_price_row(left_layout, "Reward %:", self._reward_pct_display)
+        grid.addWidget(self._reward_pct_display, row, 1)
 
+        risk_pct_label = self._make_label("Risk %")
+        grid.addWidget(risk_pct_label, row, 2)
         self._risk_pct_display = self._make_readonly_field()
-        self._add_price_row(right_layout, "Risk %:", self._risk_pct_display)
+        grid.addWidget(self._risk_pct_display, row, 3)
 
+        row += 1
+
+        rr_label = self._make_label("Risk : Reward")
+        grid.addWidget(rr_label, row, 0)
         self._rr_display = self._make_readonly_field()
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        rr_label = QLabel("Risk : Reward:")
-        rr_label.setFixedWidth(100)
-        rr_label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 13px; "
-            f"font-weight: 500; background: transparent;"
-        )
-        row.addWidget(rr_label)
-        row.addWidget(self._rr_display, 1)
-        container = QWidget()
-        container.setStyleSheet("background-color: transparent;")
-        container.setLayout(row)
+        grid.addWidget(self._rr_display, row, 1, 1, 3)
 
-        left_layout.addWidget(container)
-
-        grid_layout.addWidget(left, 1)
-        grid_layout.addWidget(right, 1)
-        self._risk_card.add_widget(grid_card)
+        self._risk_card.add_layout(grid)
 
     def _make_readonly_field(self):
         edit = QLineEdit()
         edit.setReadOnly(True)
-        edit.setStyleSheet(f"""
-        QLineEdit {{
-            background-color: {get_color('disabled_bg')};
-            color: {get_color('text_secondary')};
-            font-weight: 600;
-        }}
-        """)
+        edit.setObjectName("readonly")
+        edit.setStyleSheet(
+            f"background-color: {get_color('readonly_bg')}; "
+            f"color: {get_color('text_secondary')}; "
+            f"border: 1px solid {get_color('readonly_border')}; "
+            f"font-weight: 600;"
+        )
         return edit
+
+    def _update_readonly_style(self, edit, text_color):
+        edit.setStyleSheet(
+            f"background-color: {get_color('readonly_bg')}; "
+            f"color: {text_color}; "
+            f"border: 1px solid {get_color('readonly_border')}; "
+            f"font-weight: 600; font-size: 13px;"
+        )
 
     def _build_notes_section(self):
         self._remarks_entry = QTextEdit()
@@ -346,53 +318,23 @@ class NewTradeView(QWidget):
         if result is None:
             return
 
-        green = get_color("success")
-        red = get_color("danger")
+        green = get_color("reward_green")
+        red = get_color("risk_red")
 
         self._reward_display.setText(f"\u20b9{result.reward:,.2f}")
-        self._reward_display.setStyleSheet(f"""
-        QLineEdit {{
-            background-color: {get_color('disabled_bg')};
-            color: {green};
-            font-weight: 600;
-        }}
-        """)
+        self._update_readonly_style(self._reward_display, green)
 
         self._risk_display.setText(f"\u20b9{result.risk:,.2f}")
-        self._risk_display.setStyleSheet(f"""
-        QLineEdit {{
-            background-color: {get_color('disabled_bg')};
-            color: {red};
-            font-weight: 600;
-        }}
-        """)
+        self._update_readonly_style(self._risk_display, red)
 
         self._reward_pct_display.setText(f"{result.reward_pct:.2f}%")
-        self._reward_pct_display.setStyleSheet(f"""
-        QLineEdit {{
-            background-color: {get_color('disabled_bg')};
-            color: {green};
-            font-weight: 600;
-        }}
-        """)
+        self._update_readonly_style(self._reward_pct_display, green)
 
         self._risk_pct_display.setText(f"{result.risk_pct:.2f}%")
-        self._risk_pct_display.setStyleSheet(f"""
-        QLineEdit {{
-            background-color: {get_color('disabled_bg')};
-            color: {red};
-            font-weight: 600;
-        }}
-        """)
+        self._update_readonly_style(self._risk_pct_display, red)
 
         self._rr_display.setText(result.risk_reward)
-        self._rr_display.setStyleSheet(f"""
-        QLineEdit {{
-            background-color: {get_color('disabled_bg')};
-            color: {get_color('text_primary')};
-            font-weight: 600;
-        }}
-        """)
+        self._update_readonly_style(self._rr_display, get_color("text_primary"))
 
     def _apply_zone_offsets(self):
         sender = self.sender()
@@ -408,9 +350,8 @@ class NewTradeView(QWidget):
         if not text or entry <= 0:
             return
 
-        match_abs = re.match(r'^[+\-]\d+(\.\d+)?$', text)
         match_pct = re.match(r'^[+\-]\d+(\.\d+)?%$', text)
-        match_range = re.match(r'^[+\-]\d+(\.\d+)?$', text)
+        match_abs = re.match(r'^[+\-]\d+(\.\d+)?$', text)
 
         if match_pct:
             pct = float(text[:-1])
@@ -593,3 +534,6 @@ class NewTradeView(QWidget):
         self._reward_pct_display.clear()
         self._risk_pct_display.clear()
         self._rr_display.clear()
+
+    def refresh_style(self):
+        pass

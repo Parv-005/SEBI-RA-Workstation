@@ -30,28 +30,37 @@ class Sidebar(QFrame):
         self.setStyleSheet(self._sidebar_qss())
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 20, 12, 20)
-        layout.setSpacing(4)
+        layout.setContentsMargins(16, 24, 16, 16)
+        layout.setSpacing(0)
 
         title = QLabel("RA\nAutomation")
-        title.setFont(QFont("Segoe UI", 18, QFont.Bold))
-        title.setStyleSheet(f"color: {get_color('text_primary')}; padding: 0 0 20 0;")
+        title.setFont(QFont("Segoe UI", 20, QFont.Bold))
+        title.setStyleSheet(
+            f"color: {get_color('accent')}; padding: 0 0 28 0; background: transparent; border: none;"
+        )
         title.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         layout.addWidget(title)
+
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(
+            f"background-color: {get_color('border')}; border: none; margin: 0 0 16 0;"
+        )
+        layout.addWidget(sep)
 
         nav_container = QWidget()
         nav_container.setObjectName("nav_container")
         nav_container.setStyleSheet("background-color: transparent;")
         nav_layout = QVBoxLayout(nav_container)
         nav_layout.setContentsMargins(0, 0, 0, 0)
-        nav_layout.setSpacing(4)
+        nav_layout.setSpacing(2)
 
         for page_id, label, shortcut in self._PAGES:
-            btn = QPushButton(f"  {label}")
+            btn = QPushButton(label)
             btn.setObjectName("nav_button")
             btn.setCursor(Qt.PointingHandCursor)
             btn.setMinimumHeight(40)
-            btn.setToolTip(f"{shortcut}")
+            btn.setToolTip(shortcut)
             btn.clicked.connect(lambda checked=False, p=page_id: self._on_nav_click(p))
             nav_layout.addWidget(btn)
             self._buttons[page_id] = btn
@@ -64,12 +73,13 @@ class Sidebar(QFrame):
         theme_container.setStyleSheet("background-color: transparent;")
         theme_layout = QVBoxLayout(theme_container)
         theme_layout.setContentsMargins(0, 10, 0, 0)
-        theme_layout.setSpacing(4)
+        theme_layout.setSpacing(6)
 
         theme_label = QLabel("Appearance")
         theme_label.setStyleSheet(
-            f"color: {get_color('text_secondary')}; font-size: 11px; "
-            f"font-weight: 600; text-transform: uppercase; padding: 4px 0;"
+            f"color: {get_color('text_muted')}; font-size: 10px; "
+            f"font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; "
+            f"padding: 0; background: transparent; border: none;"
         )
         theme_layout.addWidget(theme_label)
 
@@ -78,6 +88,14 @@ class Sidebar(QFrame):
         self._theme_combo.setCurrentText("Dark" if current_theme() == "dark" else "Light")
         self._theme_combo.currentTextChanged.connect(self._on_theme_change)
         theme_layout.addWidget(self._theme_combo)
+
+        compliance = QLabel("SEBI Reg: INH000021386")
+        compliance.setStyleSheet(
+            f"color: {get_color('text_muted')}; font-size: 9px; "
+            f"padding: 8 0 0 0; background: transparent; border: none;"
+        )
+        compliance.setAlignment(Qt.AlignLeft)
+        theme_layout.addWidget(compliance)
 
         layout.addWidget(theme_container)
 
@@ -90,6 +108,9 @@ class Sidebar(QFrame):
         text = get_color("text_primary")
         muted = get_color("text_secondary")
         border = get_color("border")
+        nav_active = get_color("nav_active_bg")
+        nav_border = get_color("nav_active_border")
+        text_muted = get_color("text_muted")
 
         return f"""
         #sidebar {{
@@ -101,20 +122,25 @@ class Sidebar(QFrame):
             background-color: transparent;
             color: {muted};
             border: none;
-            border-radius: 8px;
-            padding: 10px 14px;
+            border-left: 3px solid transparent;
+            border-radius: 0 6px 6px 0;
+            padding: 10px 14px 10px 11px;
             text-align: left;
             font-size: 13px;
             font-weight: 500;
+            margin: 1px 6px 1px 0;
         }}
         QPushButton#nav_button:hover {{
             background-color: {hover};
             color: {text};
+            border-left: 3px solid {text_muted};
         }}
         QPushButton#nav_button:checked,
         QPushButton#nav_button[active="true"] {{
-            background-color: {accent};
-            color: {text};
+            background-color: {nav_active};
+            color: {accent};
+            border-left: 3px solid {nav_border};
+            font-weight: 600;
         }}
         QComboBox {{
             font-size: 12px;
@@ -140,8 +166,19 @@ class Sidebar(QFrame):
         theme = mode.lower()
         apply_theme(theme)
         self.setStyleSheet(self._sidebar_qss())
+        self._update_active_button()
+        for child in self.findChildren(QLabel):
+            if "SEBI" in child.text():
+                child.setStyleSheet(
+                    f"color: {get_color('text_muted')}; font-size: 9px; "
+                    f"padding: 8 0 0 0; background: transparent; border: none;"
+                )
         get_signals().theme_changed.emit(theme)
 
     def set_active(self, page_id):
         self._active_page = page_id
+        self._update_active_button()
+
+    def refresh_style(self):
+        self.setStyleSheet(self._sidebar_qss())
         self._update_active_button()

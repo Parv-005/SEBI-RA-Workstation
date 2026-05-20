@@ -12,22 +12,25 @@ class FieldRow(QWidget):
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 4, 0, 4)
-        layout.setSpacing(8)
+        layout.setSpacing(12)
 
         self._label = QLabel(label)
         self._label.setFixedWidth(label_width)
-        self._label.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        self._label.setStyleSheet(f"color: {get_color('text_secondary')}; "
-                                   f"background: transparent; border: none;")
+        self._label.setFont(QFont("Segoe UI", 11))
+        self._label.setStyleSheet(
+            f"color: {get_color('text_muted')}; background: transparent; border: none; "
+            f"font-weight: 600; letter-spacing: 0.3px;"
+        )
         layout.addWidget(self._label)
 
         self._value = QLabel(str(value))
         self._value.setFont(QFont("Segoe UI", 12))
-        self._value.setStyleSheet(f"color: {get_color('text_primary')}; "
-                                   f"background: transparent; border: none;")
+        self._value.setStyleSheet(
+            f"color: {get_color('text_primary')}; background: transparent; border: none;"
+        )
         if value_color:
             self._value.setStyleSheet(
-                f"color: {value_color}; background: transparent; border: none;"
+                f"color: {value_color}; background: transparent; border: none; font-weight: 600;"
             )
         self._value.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self._value, 1)
@@ -36,7 +39,7 @@ class FieldRow(QWidget):
         self._value.setText(str(text))
         if color:
             self._value.setStyleSheet(
-                f"color: {color}; background: transparent; border: none;"
+                f"color: {color}; background: transparent; border: none; font-weight: 600;"
             )
         else:
             self._value.setStyleSheet(
@@ -46,5 +49,5 @@ class FieldRow(QWidget):
     def set_value_color(self, color):
         if color:
             self._value.setStyleSheet(
-                f"color: {color}; background: transparent; border: none;"
+                f"color: {color}; background: transparent; border: none; font-weight: 600;"
             )

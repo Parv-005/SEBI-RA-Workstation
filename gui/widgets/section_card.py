@@ -11,16 +11,16 @@ class SectionCard(QFrame):
         self.setObjectName("card")
 
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(20, 16, 20, 16)
-        self._layout.setSpacing(8)
+        self._layout.setContentsMargins(24, 18, 24, 18)
+        self._layout.setSpacing(12)
 
         if title:
-            header = QLabel(title)
+            header = QLabel(title.upper())
             header.setObjectName("card_header")
-            header.setFont(QFont("Segoe UI", 12, QFont.Bold))
+            header.setFont(QFont("Segoe UI", 11, QFont.Bold))
             header.setStyleSheet(
-                f"color: {get_color('text_primary')}; background: transparent; "
-                f"border: none; font-size: 14px; padding-bottom: 4px;"
+                f"color: {get_color('accent')}; background: transparent; "
+                f"border: none; letter-spacing: 1px;"
             )
             self._layout.addWidget(header)
 
@@ -32,13 +32,11 @@ class SectionCard(QFrame):
             )
             self._layout.addWidget(separator)
 
-            self._separator = separator
-
         self._content = QWidget()
         self._content.setStyleSheet("background-color: transparent;")
         self._content_layout = QVBoxLayout(self._content)
-        self._content_layout.setContentsMargins(0, 8, 0, 0)
-        self._content_layout.setSpacing(2)
+        self._content_layout.setContentsMargins(0, 4, 0, 0)
+        self._content_layout.setSpacing(6)
         self._layout.addWidget(self._content, 1)
 
     def content_layout(self):
@@ -49,3 +47,11 @@ class SectionCard(QFrame):
 
     def add_layout(self, layout):
         self._content_layout.addLayout(layout)
+
+    def refresh_style(self):
+        for child in self.findChildren(QLabel):
+            if child.objectName() == "card_header":
+                child.setStyleSheet(
+                    f"color: {get_color('accent')}; background: transparent; "
+                    f"border: none; letter-spacing: 1px;"
+                )

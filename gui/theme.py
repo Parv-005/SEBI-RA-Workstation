@@ -3,59 +3,93 @@ from PySide6.QtWidgets import QApplication
 
 
 DARK_COLORS = {
-    "bg": "#1a1a2e",
-    "surface": "#16213e",
-    "surface_hover": "#1a2744",
-    "surface_secondary": "#1e2d50",
-    "accent": "#0f3460",
-    "accent_hover": "#144a80",
-    "success": "#28a745",
-    "danger": "#e94560",
-    "warning": "#f0ad4e",
-    "info": "#17a2b8",
-    "text_primary": "#e6e6e6",
-    "text_secondary": "#a0a0b0",
-    "text_muted": "#6c6c80",
-    "border": "#2a2a4a",
-    "input_bg": "#12122a",
-    "disabled_bg": "#14142a",
-    "scrollbar_bg": "#1a1a2e",
-    "scrollbar_handle": "#2a2a4a",
-    "scrollbar_hover": "#3a3a5a",
-    "badge_blue": "#0f3460",
-    "badge_teal": "#17a2b8",
-    "badge_gray": "#6c757d",
-    "badge_green": "#28a745",
-    "badge_red": "#e94560",
-    "badge_yellow": "#f0ad4e",
+    "bg": "#121212",
+    "surface": "#1E1E28",
+    "surface_hover": "#2A2A36",
+    "surface_secondary": "#24242E",
+    "accent": "#D4AF37",
+    "accent_hover": "#E6C24F",
+    "accent_darker": "#B8962E",
+    "success": "#4CAF50",
+    "danger": "#EF5350",
+    "warning": "#FFB74D",
+    "info": "#29B6F6",
+    "text_primary": "#E0E0E0",
+    "text_secondary": "#9E9E9E",
+    "text_muted": "#616161",
+    "border": "#2C2C3A",
+    "border_focus": "#D4AF37",
+    "input_bg": "#1A1A24",
+    "input_border": "#3A3A4A",
+    "input_border_focus": "#D4AF37",
+    "disabled_bg": "#1A1A24",
+    "disabled_text": "#4A4A5A",
+    "card_bg": "#1E1E28",
+    "card_border": "#2C2C3A",
+    "card_header_bg": "#24242E",
+    "readonly_bg": "#181820",
+    "readonly_border": "#2A2A36",
+    "button_gold_bg": "#D4AF37",
+    "button_gold_hover": "#E6C24F",
+    "button_gold_text": "#121212",
+    "scrollbar_bg": "#121212",
+    "scrollbar_handle": "#2C2C3A",
+    "scrollbar_hover": "#3A3A4A",
+    "nav_active_bg": "#2A2A36",
+    "nav_active_border": "#D4AF37",
+    "badge_blue": "#1565C0",
+    "badge_teal": "#00897B",
+    "badge_gray": "#616161",
+    "badge_green": "#2E7D32",
+    "badge_red": "#C62828",
+    "badge_yellow": "#F9A825",
+    "reward_green": "#4CAF50",
+    "risk_red": "#EF5350",
 }
 
 LIGHT_COLORS = {
-    "bg": "#f0f0f5",
-    "surface": "#ffffff",
-    "surface_hover": "#e8e8f0",
-    "surface_secondary": "#f5f5fa",
-    "accent": "#0f3460",
-    "accent_hover": "#144a80",
-    "success": "#28a745",
-    "danger": "#e94560",
-    "warning": "#f0ad4e",
-    "info": "#17a2b8",
-    "text_primary": "#1a1a2e",
+    "bg": "#F5F5F5",
+    "surface": "#FFFFFF",
+    "surface_hover": "#EEEEF0",
+    "surface_secondary": "#F0F0F5",
+    "accent": "#B8962E",
+    "accent_hover": "#D4AF37",
+    "accent_darker": "#9A7D26",
+    "success": "#2E7D32",
+    "danger": "#C62828",
+    "warning": "#F9A825",
+    "info": "#0288D1",
+    "text_primary": "#1A1A2E",
     "text_secondary": "#666680",
-    "text_muted": "#9999aa",
-    "border": "#d0d0dd",
-    "input_bg": "#ffffff",
-    "disabled_bg": "#f0f0f5",
-    "scrollbar_bg": "#f0f0f5",
-    "scrollbar_handle": "#c0c0d0",
-    "scrollbar_hover": "#a0a0b0",
-    "badge_blue": "#0f3460",
-    "badge_teal": "#17a2b8",
-    "badge_gray": "#6c757d",
-    "badge_green": "#28a745",
-    "badge_red": "#e94560",
-    "badge_yellow": "#f0ad4e",
+    "text_muted": "#9E9E9E",
+    "border": "#D0D0DD",
+    "border_focus": "#B8962E",
+    "input_bg": "#FFFFFF",
+    "input_border": "#C0C0D0",
+    "input_border_focus": "#B8962E",
+    "disabled_bg": "#F0F0F5",
+    "disabled_text": "#9E9E9E",
+    "card_bg": "#FFFFFF",
+    "card_border": "#D0D0DD",
+    "card_header_bg": "#F5F5FA",
+    "readonly_bg": "#F5F5FA",
+    "readonly_border": "#E0E0E8",
+    "button_gold_bg": "#B8962E",
+    "button_gold_hover": "#D4AF37",
+    "button_gold_text": "#FFFFFF",
+    "scrollbar_bg": "#F5F5F5",
+    "scrollbar_handle": "#C0C0D0",
+    "scrollbar_hover": "#A0A0B0",
+    "nav_active_bg": "#F0EDE0",
+    "nav_active_border": "#B8962E",
+    "badge_blue": "#1565C0",
+    "badge_teal": "#00897B",
+    "badge_gray": "#757575",
+    "badge_green": "#2E7D32",
+    "badge_red": "#C62828",
+    "badge_yellow": "#F9A825",
+    "reward_green": "#2E7D32",
+    "risk_red": "#C62828",
 }
 
 _current_colors = DARK_COLORS
@@ -75,7 +109,7 @@ def _build_qss(c):
 QMainWindow {{
     background-color: {c['bg']};
     color: {c['text_primary']};
-    font-family: "Segoe UI", "Arial", sans-serif;
+    font-family: "Segoe UI", "Inter", "Roboto", "Arial", sans-serif;
     font-size: 13px;
 }}
 
@@ -93,12 +127,12 @@ QLabel {{
 
 QPushButton {{
     background-color: {c['accent']};
-    color: {c['text_primary']};
+    color: {c['button_gold_text']};
     border: none;
     border-radius: 6px;
     padding: 8px 20px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     min-height: 20px;
 }}
 
@@ -107,28 +141,30 @@ QPushButton:hover {{
 }}
 
 QPushButton:pressed {{
-    background-color: {c['accent']};
+    background-color: {c['accent_darker']};
 }}
 
 QPushButton:disabled {{
     background-color: {c['disabled_bg']};
-    color: {c['text_muted']};
+    color: {c['disabled_text']};
 }}
 
 QPushButton#danger {{
     background-color: {c['danger']};
+    color: #FFFFFF;
 }}
 
 QPushButton#danger:hover {{
-    background-color: #d63851;
+    background-color: #C62828;
 }}
 
 QPushButton#success {{
     background-color: {c['success']};
+    color: #FFFFFF;
 }}
 
 QPushButton#success:hover {{
-    background-color: #23923d;
+    background-color: #388E3C;
 }}
 
 QPushButton#ghost {{
@@ -140,49 +176,81 @@ QPushButton#ghost {{
 QPushButton#ghost:hover {{
     background-color: {c['surface_hover']};
     color: {c['text_primary']};
+    border-color: {c['text_muted']};
+}}
+
+QPushButton#gold {{
+    background-color: {c['button_gold_bg']};
+    color: {c['button_gold_text']};
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+}}
+
+QPushButton#gold:hover {{
+    background-color: {c['button_gold_hover']};
 }}
 
 QLineEdit {{
     background-color: {c['input_bg']};
     color: {c['text_primary']};
-    border: 1px solid {c['border']};
+    border: 1px solid {c['input_border']};
     border-radius: 6px;
     padding: 8px 12px;
     font-size: 13px;
     selection-background-color: {c['accent']};
+    selection-color: {c['button_gold_text']};
 }}
 
 QLineEdit:focus {{
-    border: 1px solid {c['accent']};
+    border: 2px solid {c['input_border_focus']};
+    padding: 7px 11px;
 }}
 
 QLineEdit:disabled {{
     background-color: {c['disabled_bg']};
-    color: {c['text_muted']};
+    color: {c['disabled_text']};
+    border: 1px solid {c['border']};
+}}
+
+QLineEdit:disabled:focus {{
+    border: 1px solid {c['border']};
+    padding: 8px 12px;
 }}
 
 QLineEdit#error {{
     border: 1px solid {c['danger']};
 }}
 
+QLineEdit#readonly {{
+    background-color: {c['readonly_bg']};
+    color: {c['text_secondary']};
+    border: 1px solid {c['readonly_border']};
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 8px 12px;
+}}
+
 QTextEdit {{
     background-color: {c['input_bg']};
     color: {c['text_primary']};
-    border: 1px solid {c['border']};
+    border: 1px solid {c['input_border']};
     border-radius: 6px;
     padding: 8px 12px;
     font-size: 13px;
     selection-background-color: {c['accent']};
+    selection-color: {c['button_gold_text']};
 }}
 
 QTextEdit:focus {{
-    border: 1px solid {c['accent']};
+    border: 2px solid {c['input_border_focus']};
+    padding: 7px 11px;
 }}
 
 QComboBox {{
     background-color: {c['input_bg']};
     color: {c['text_primary']};
-    border: 1px solid {c['border']};
+    border: 1px solid {c['input_border']};
     border-radius: 6px;
     padding: 8px 12px;
     font-size: 13px;
@@ -190,7 +258,11 @@ QComboBox {{
 }}
 
 QComboBox:hover {{
-    border: 1px solid {c['accent']};
+    border: 1px solid {c['text_muted']};
+}}
+
+QComboBox:focus {{
+    border: 2px solid {c['input_border_focus']};
 }}
 
 QComboBox::drop-down {{
@@ -211,7 +283,7 @@ QComboBox QAbstractItemView {{
     border-radius: 4px;
     padding: 4px;
     selection-background-color: {c['accent']};
-    selection-color: {c['text_primary']};
+    selection-color: {c['button_gold_text']};
     outline: none;
 }}
 
@@ -232,7 +304,7 @@ QTableView {{
     border-radius: 6px;
     gridline-color: {c['border']};
     selection-background-color: {c['accent']};
-    selection-color: {c['text_primary']};
+    selection-color: {c['button_gold_text']};
     font-size: 13px;
 }}
 
@@ -247,7 +319,7 @@ QTableView::item:hover {{
 }}
 
 QHeaderView::section {{
-    background-color: {c['surface_secondary']};
+    background-color: {c['card_header_bg']};
     color: {c['text_secondary']};
     border: none;
     border-bottom: 1px solid {c['border']};
@@ -308,8 +380,8 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 }}
 
 QFrame#card {{
-    background-color: {c['surface']};
-    border: 1px solid {c['border']};
+    background-color: {c['card_bg']};
+    border: 1px solid {c['card_border']};
     border-radius: 8px;
 }}
 
@@ -350,10 +422,9 @@ QGroupBox::title {{
     subcontrol-origin: margin;
     subcontrol-position: top left;
     padding: 2px 10px;
-    color: {c['text_secondary']};
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
+    color: {c['accent']};
+    font-size: 12px;
+    font-weight: 700;
 }}
 
 QCheckBox {{
@@ -417,9 +488,23 @@ def apply_theme(appearance_mode="dark"):
         palette.setColor(QPalette.Button, QColor(c["surface"]))
         palette.setColor(QPalette.ButtonText, QColor(c["text_primary"]))
         palette.setColor(QPalette.Highlight, QColor(c["accent"]))
-        palette.setColor(QPalette.HighlightedText, QColor(c["text_primary"]))
+        palette.setColor(QPalette.HighlightedText, QColor(c["button_gold_text"]))
         palette.setColor(QPalette.ToolTipBase, QColor(c["surface"]))
         palette.setColor(QPalette.ToolTipText, QColor(c["text_primary"]))
         palette.setColor(QPalette.Disabled, QPalette.Text, QColor(c["text_muted"]))
         palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(c["text_muted"]))
         app.setPalette(palette)
+
+    from gui.widgets.sidebar import Sidebar
+    from gui.views.trade_form import NewTradeView
+    from gui.widgets.section_card import SectionCard
+    from gui.widgets.toast import ToastWidget
+    from gui.views.trade_detail import TradeDetailView
+    from gui.views.trade_list import TradeListView
+
+    for widget_cls in [Sidebar, NewTradeView, SectionCard, ToastWidget,
+                       TradeDetailView, TradeListView]:
+        for instance in app.allWidgets():
+            if isinstance(instance, widget_cls):
+                if hasattr(instance, 'refresh_style'):
+                    instance.refresh_style()
