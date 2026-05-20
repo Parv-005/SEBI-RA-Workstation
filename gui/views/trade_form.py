@@ -69,8 +69,19 @@ class NewTradeView(QWidget):
         self._build_notes_section()
         form_layout.addWidget(self._notes_card)
 
+        form_layout.addSpacing(24)
+
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(
+            f"background-color: {get_color('border')}; border: none;"
+        )
+        form_layout.addWidget(sep)
+
+        form_layout.addSpacing(16)
+
         submit_layout = QHBoxLayout()
-        submit_layout.setContentsMargins(0, 8, 0, 0)
+        submit_layout.setContentsMargins(0, 0, 0, 0)
         submit_layout.addStretch()
 
         self._submit_btn = QPushButton("Submit Trade & Broadcast")
