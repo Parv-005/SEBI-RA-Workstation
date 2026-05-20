@@ -1,7 +1,5 @@
 import sys
 import json
-import tkinter as tk
-from tkinter import messagebox
 from core.paths import DATA_DIR, CONSTANTS_PATH
 
 _DEFAULT_CONSTANTS = {
@@ -135,19 +133,31 @@ _DEFAULT_CONSTANTS = {
 
 def check_constants_file():
     if not CONSTANTS_PATH.exists():
-        root = tk.Tk()
-        root.withdraw()
-        ans = messagebox.askyesno(
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        app_check = QApplication.instance()
+        if not app_check:
+            app_check = QApplication(sys.argv)
+        ans = QMessageBox.question(
+            None,
             "Missing Configuration",
             "The essential configuration file 'app_constants.json' is missing.\n\n"
             "Should the software automatically create it with default values to continue?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
-        if ans:
+        if ans == QMessageBox.Yes:
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             with open(CONSTANTS_PATH, "w") as f:
                 json.dump(_DEFAULT_CONSTANTS, f, indent=4)
-            messagebox.showinfo("Success", "app_constants.json recreated successfully.")
+            QMessageBox.information(
+                None, "Success",
+                "app_constants.json recreated successfully."
+            )
         else:
-            messagebox.showerror("Error", "The application cannot start without 'app_constants.json'. Exiting.")
+            QMessageBox.critical(
+                None, "Error",
+                "The application cannot start without 'app_constants.json'. Exiting."
+            )
             sys.exit(1)
-        root.destroy()
+        if not QApplication.instance():
+            app_check.quit()

@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from utils.constants import ACTION_DISPLAY_MAP, ACTION_DB_MAP
 from utils.logger import setup_logger
@@ -147,4 +148,24 @@ def _resolve_old_value(trade: dict, field: str):
     original = _LATEST_FIELD_ORIGINALS.get(field)
     if original:
         return trade.get(original)
+    return None
+
+
+_ZONE_OFFSET_PATTERNS = [
+    (re.compile(r'^[+\-]\d+(\.\d+)?%$'), True),
+    (re.compile(r'^[+\-]\d+(\.\d+)?$'), False),
+]
+
+
+def parse_zone_offset(text: str, entry_price: float) -> float | None:
+    if not text or entry_price <= 0:
+        return None
+
+    for pattern, is_percent in _ZONE_OFFSET_PATTERNS:
+        m = pattern.match(text.strip())
+        if m:
+            delta = float(text.strip())
+            if is_percent:
+                return entry_price + (entry_price * delta / 100)
+            return entry_price + delta
     return None

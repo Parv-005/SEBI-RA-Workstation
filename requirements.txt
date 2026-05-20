@@ -1,0 +1,13 @@
+PySide6>=6.7.0
+openpyxl>=3.1.5
+Pillow>=12.1.1
+Telethon>=1.42.0
+gspread>=6.2.1
+google-auth>=2.49.1
+google-auth-oauthlib>=1.3.0
+smartapi-python>=1.5.5
+pyotp>=2.9.0
+cryptography>=46.0.5
+requests>=2.32.5
+psd-tools>=1.17.0
+icecream>=2.2.0
