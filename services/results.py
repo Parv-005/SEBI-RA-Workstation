@@ -21,6 +21,7 @@ class BroadcastResult:
     sheets_success: bool | str = False
     sheets_unmapped: list[str] = field(default_factory=list)
     telegram_success: bool | str = False
+    telegram_msg_id: int | None = None
     errors: list[str] = field(default_factory=list)
 
     def has_errors(self) -> bool:

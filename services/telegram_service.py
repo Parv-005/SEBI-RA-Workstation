@@ -71,24 +71,42 @@ class TelegramService:
             logger.error(f"Sign in failed: {e}", exc_info=True)
             raise
 
-    async def send_trade_message(self, message: str, image_path: str | None = None):
+    async def send_trade_message(self, message: str, image_path: str | None = None) -> int:
         if not self.connected or not self.client:
             logger.error("Attempted to send message while Telegram is not connected.")
             raise ConnectionError("Telegram not connected.")
         try:
             group = int(self.group_id) if self.group_id.lstrip("-").isdigit() else self.group_id
             if image_path and os.path.exists(image_path):
-                await self.client.send_file(group, image_path, caption=message)
+                msg = await self.client.send_file(group, image_path, caption=message)
                 logger.info("Sent message with image to Telegram.")
             else:
-                await self.client.send_message(group, message)
+                msg = await self.client.send_message(group, message)
                 logger.info("Sent text message to Telegram.")
+            return msg.id
         except Exception as e:
             logger.error(f"Failed to send Telegram message: {e}", exc_info=True)
             raise
 
-    async def send_update_message(self, message: str, image_path: str | None = None):
-        await self.send_trade_message(message, image_path)
+    async def send_update_message(self, message: str, image_path: str | None = None, reply_to: int | None = None) -> int:
+        if not self.connected or not self.client:
+            logger.error("Attempted to send message while Telegram is not connected.")
+            raise ConnectionError("Telegram not connected.")
+        try:
+            group = int(self.group_id) if self.group_id.lstrip("-").isdigit() else self.group_id
+            kwargs = {}
+            if reply_to is not None:
+                kwargs["reply_to"] = reply_to
+            if image_path and os.path.exists(image_path):
+                msg = await self.client.send_file(group, image_path, caption=message, **kwargs)
+                logger.info("Sent update message with image to Telegram.")
+            else:
+                msg = await self.client.send_message(group, message, **kwargs)
+                logger.info("Sent update text message to Telegram.")
+            return msg.id
+        except Exception as e:
+            logger.error(f"Failed to send Telegram update message: {e}", exc_info=True)
+            raise
 
     async def disconnect(self):
         if self.client:

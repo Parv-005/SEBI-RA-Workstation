@@ -14,6 +14,27 @@ logger = setup_logger("TradesDB")
 TRADES_HEADERS = DEFAULT_HEADERS()
 
 
+def _ensure_schema_columns():
+    try:
+        if not TRADES_PATH.exists():
+            return
+        wb = load_workbook(TRADES_PATH)
+        ws = wb.active
+        existing = [c.value for c in ws[1]]
+        added = False
+        for header in TRADES_HEADERS:
+            if header not in existing:
+                ws.cell(row=1, column=len(existing) + 1, value=header)
+                existing.append(header)
+                added = True
+        if added:
+            _save_workbook(wb, TRADES_PATH)
+            invalidate_cache("trades")
+            logger.info("Added missing schema columns to trades.xlsx")
+    except Exception as e:
+        logger.error(f"Error ensuring schema columns: {e}", exc_info=True)
+
+
 def get_trades_headers():
     return TRADES_HEADERS
 
@@ -21,6 +42,7 @@ def get_trades_headers():
 def insert_trade(trade_data: dict) -> tuple[str, dict]:
     try:
         _ensure_data_dir()
+        _ensure_schema_columns()
         try:
             wb = load_workbook(TRADES_PATH)
             ws = wb.active
@@ -86,6 +108,7 @@ def update_trade(trade_code: str, fields: dict) -> bool:
         raise ValueError("Strict Check Failed: trade_code is required to update a trade.")
 
     try:
+        _ensure_schema_columns()
         trade_data = get_trade(trade_code)
         if not trade_data:
             logger.warning(f"Trade code {trade_code} not found for update.")

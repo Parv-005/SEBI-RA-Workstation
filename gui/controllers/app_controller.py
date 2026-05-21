@@ -21,8 +21,11 @@ from utils.message_formatter import format_new_trade, format_trade_update
 from utils.async_helper import run_async, run_async_in_thread
 from core.config import Config
 from utils.config_manager import save_config
+from utils.logger import setup_logger
 import threading
 import asyncio
+
+logger = setup_logger("AppController")
 
 
 class AppController(QObject):
@@ -103,12 +106,22 @@ class AppController(QObject):
                     if not authed:
                         return "not_authorized"
                     msg = format_new_trade(trade)
-                    await tg.send_trade_message(msg, result.image_path)
+                    msg_id = await tg.send_trade_message(msg, result.image_path)
                     await tg.disconnect()
-                    return True
+                    return msg_id
 
                 tg_result = run_async(_send())
-                result.telegram_success = tg_result
+                if isinstance(tg_result, int):
+                    result.telegram_success = True
+                    result.telegram_msg_id = tg_result
+                    try:
+                        update_trade(trade["trade_code"], {"telegram_msg_id": str(tg_result)})
+                    except Exception as e:
+                        logger.warning(f"Failed to persist telegram_msg_id: {e}")
+                elif tg_result == "not_authorized":
+                    result.telegram_success = "not_authorized"
+                else:
+                    result.telegram_success = bool(tg_result)
             else:
                 result.telegram_success = "not_configured"
         except Exception as e:
@@ -179,18 +192,36 @@ class AppController(QObject):
         try:
             tg = TelegramService()
             if tg.is_configured():
+                reply_to_id = None
+                fresh_trade = get_trade(trade["trade_code"])
+                raw = fresh_trade.get("telegram_msg_id") if fresh_trade else None
+                if raw:
+                    try:
+                        reply_to_id = int(raw)
+                    except (ValueError, TypeError):
+                        reply_to_id = None
 
                 async def _send():
                     authed = await tg.connect()
                     if not authed:
                         return "not_authorized"
                     msg = format_trade_update(trade, update_data_dict)
-                    await tg.send_update_message(msg, result.image_path)
+                    msg_id = await tg.send_update_message(msg, result.image_path, reply_to=reply_to_id)
                     await tg.disconnect()
-                    return True
+                    return msg_id
 
                 tg_result = run_async(_send())
-                result.telegram_success = tg_result
+                if isinstance(tg_result, int):
+                    result.telegram_success = True
+                    result.telegram_msg_id = tg_result
+                    try:
+                        update_trade(trade["trade_code"], {"telegram_msg_id": str(tg_result)})
+                    except Exception as e:
+                        logger.warning(f"Failed to persist telegram_msg_id: {e}")
+                elif tg_result == "not_authorized":
+                    result.telegram_success = "not_authorized"
+                else:
+                    result.telegram_success = bool(tg_result)
             else:
                 result.telegram_success = "not_configured"
         except Exception as e:

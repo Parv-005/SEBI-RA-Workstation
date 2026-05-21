@@ -10,6 +10,7 @@ class TradeController:
         from services.image_generator import ImageGenerator
         from services.telegram_service import TelegramService
         from services.google_sheets_service import GoogleSheetsService
+        from database.trades_db import update_trade
 
         result = BroadcastResult()
         img_path = None
@@ -54,15 +55,22 @@ class TradeController:
                             await tg.disconnect()
                             return "not_authorized"
                         msg = format_new_trade(trade)
-                        await tg.send_trade_message(msg, img_path)
+                        msg_id = await tg.send_trade_message(msg, img_path)
                         await tg.disconnect()
-                        return True
+                        return msg_id
                     except Exception as e:
                         logger.error(f"Telegram send error: {e}", exc_info=True)
                         raise
 
                 success = run_async(send_tg())
-                if success == "not_authorized":
+                if isinstance(success, int):
+                    result.telegram_success = True
+                    result.telegram_msg_id = success
+                    try:
+                        update_trade(trade["trade_code"], {"telegram_msg_id": str(success)})
+                    except Exception as e:
+                        logger.warning(f"Failed to persist telegram_msg_id: {e}")
+                elif success == "not_authorized":
                     result.telegram_success = "not_authorized"
                 else:
                     result.telegram_success = bool(success)
@@ -79,6 +87,7 @@ class TradeController:
         from services.image_generator import ImageGenerator
         from services.telegram_service import TelegramService
         from services.google_sheets_service import GoogleSheetsService
+        from database.trades_db import update_trade, get_trade
 
         if not trade.get("trade_code") or trade["trade_code"] == "?":
             raise ValueError("Strict Check Failed: trade_code is required to broadcast an update.")
@@ -125,6 +134,15 @@ class TradeController:
             if tg.is_configured():
                 from utils.message_formatter import format_trade_update
 
+                reply_to_id = None
+                fresh_trade = get_trade(trade["trade_code"])
+                raw = fresh_trade.get("telegram_msg_id") if fresh_trade else None
+                if raw:
+                    try:
+                        reply_to_id = int(raw)
+                    except (ValueError, TypeError):
+                        reply_to_id = None
+
                 async def send_tg():
                     try:
                         authorized = await tg.connect()
@@ -133,15 +151,22 @@ class TradeController:
                             await tg.disconnect()
                             return "not_authorized"
                         msg = format_trade_update(trade, update_data)
-                        await tg.send_update_message(msg, img_path)
+                        msg_id = await tg.send_update_message(msg, img_path, reply_to=reply_to_id)
                         await tg.disconnect()
-                        return True
+                        return msg_id
                     except Exception as e:
                         logger.error(f"Telegram send error: {e}", exc_info=True)
                         raise
 
                 success = run_async(send_tg())
-                if success == "not_authorized":
+                if isinstance(success, int):
+                    result.telegram_success = True
+                    result.telegram_msg_id = success
+                    try:
+                        update_trade(trade["trade_code"], {"telegram_msg_id": str(success)})
+                    except Exception as e:
+                        logger.warning(f"Failed to persist telegram_msg_id: {e}")
+                elif success == "not_authorized":
                     result.telegram_success = "not_authorized"
                 else:
                     result.telegram_success = bool(success)
