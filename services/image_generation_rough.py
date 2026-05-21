@@ -53,7 +53,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from psd_tools import PSDImage
 from psd_tools.api.layers import TypeLayer
 from psd_tools.psd import engine_data
-from PIL import Image
+from psd_tools.psd.descriptor import String
+from PIL import Image, ImageDraw, ImageFont
 
 from core.paths import CONFIG_PATH, IMAGES_DIR, DATA_DIR
 from utils.logger import setup_logger
@@ -85,6 +86,7 @@ def _set_text_in_layer_tree(layer_group, replacements: dict[str, str]) -> None:
             try:
                 new_text = replacements[layer.name] + "\x00"
                 layer._engine_data["EngineDict"]["Editor"]["Text"] = engine_data.String(new_text)
+                layer._data.text_data[b"Txt "] = String(value=new_text)
             except Exception as exc:
                 logger.warning(
                     f"Could not patch text in layer '{layer.name}': {exc}"
@@ -294,10 +296,44 @@ class PSDImageGenerator:
             psd.save(tmp_path)
             logger.debug(f"Saved modified PSD to temp: {tmp_path}")
 
-            # Step 4 — re-open and composite
             psd_modified = PSDImage.open(tmp_path)
-            rendered: Image.Image = psd_modified.composite(ignore_preview=True)
-            logger.debug("Composite rendering complete.")
+            logger.debug("Reopened modified PSD for text-overlay compositing")
+
+            base_img = psd_modified.composite(ignore_preview=True)
+            canvas = base_img.convert("RGBA") if base_img.mode != "RGBA" else base_img.copy()
+
+            text_img = Image.new("RGBA", canvas.size, (255, 255, 255, 0))
+            text_draw = ImageDraw.Draw(text_img)
+
+            for layer in psd_modified:
+                if not isinstance(layer, TypeLayer) or not layer.visible:
+                    continue
+                text = replacements.get(layer.name, layer.text)
+                if not text:
+                    continue
+                left, top, right, bottom = layer.bbox
+                font_size = 48
+                style_run = layer._engine_data.get("EngineDict", {}).get("StyleRun", {})
+                run_array = style_run.get("RunArray", [])
+                if run_array:
+                    font_size = int(run_array[0].get("StyleSheet", {}).get("StyleSheetData", {}).get("FontSize", 48) or 48)
+
+                layer_font = None
+                for fp in ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]:
+                    if os.path.exists(fp):
+                        try:
+                            layer_font = ImageFont.truetype(fp, size=font_size)
+                            break
+                        except Exception:
+                            pass
+                if layer_font is None:
+                    layer_font = ImageFont.load_default()
+
+                text_draw.text((left, top), text, fill=(0, 0, 0, 255), font=layer_font)
+
+            canvas.paste(text_img, (0, 0), text_img)
+            rendered = canvas
+            logger.debug("Text-overlay compositing complete.")
 
             # Step 5 — save PNG
             output_path = str(OUTPUT_DIR / output_filename)
