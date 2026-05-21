@@ -63,7 +63,7 @@ class ImageGenerator:
                 "action": trade.get("action", ""),
                 "entry_price": f"₹{trade.get('entry_price', 0):.2f}",
                 "zone": (
-                    f"₹{trade['zone_start']:.2f} – ₹{trade['zone_end']:.2f}"
+                    f"₹{float(trade['zone_start']):.2f} – ₹{float(trade['zone_end']):.2f}"
                     if trade.get("zone_start") and trade.get("zone_end") else ""
                 ),
                 "target": f"₹{trade.get('target', 0):.2f}",
@@ -145,7 +145,7 @@ class ImageGenerator:
             f"Entry Price : ₹{trade.get('entry_price', 0):.2f}",
         ]
         if trade.get("zone_start") and trade.get("zone_end"):
-            lines.append(f"Zone        : ₹{trade['zone_start']:.2f} – ₹{trade['zone_end']:.2f}")
+            lines.append(f"Zone        : ₹{float(trade['zone_start']):.2f} – ₹{float(trade['zone_end']):.2f}")
         lines += [
             f"Target      : ₹{trade.get('target', 0):.2f}",
             f"Stop Loss   : ₹{trade.get('stop_loss', 0):.2f}",
