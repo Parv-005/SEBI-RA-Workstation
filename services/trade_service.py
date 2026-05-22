@@ -30,6 +30,7 @@ def calculate_risk_reward(
 
     if risk == 0 or reward <= 0:
         risk_reward_str = ""
+        logger.debug(f"RR calc: risk={risk} reward={reward} -> empty ratio")
     else:
         ratio = reward / risk
         risk_reward_str = f"1 : {ratio:.2f}"
@@ -85,6 +86,7 @@ def compute_update_fields(
         trade_updates["status"] = "CLOSED"
         trade_updates["exit_datetime"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         trade_updates["close_narration"] = f"[{update_type}] {remarks}"
+        logger.debug(f"compute_update_fields: closing trade {trade_code}")
 
     # ── Process configured set fields ─────────────────────────────────────────
     for field, placeholder in set_fields.items():

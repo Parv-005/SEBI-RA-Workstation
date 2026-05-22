@@ -5,6 +5,7 @@
         { "key": "segment", "label": "Segment", "type": "string" },
         { "key": "trade_type", "label": "Trade Type", "type": "string" },
         { "key": "created_at", "label": "Trade Given DateTime", "type": "string" },
+        { "key": "updated_at", "label": "Updated At", "type": "string" },
         { "key": "stock_name", "label": "Security Name", "type": "string" },
         { "key": "cmp_at_entry", "label": "Security CMP when Trade Given", "type": "string" },
         { "key": "entry_price", "label": "Entry Price", "type": "string" },
@@ -38,7 +39,8 @@
         { "key": "exit_datetime", "label": "Trade Exit DateTime", "type": "string" },
         { "key": "holding_period", "label": "Holding Period", "type": "string" },
         { "key": "updates", "label": "Updates", "type": "string" },
-        { "key": "telegram_msg_id", "label": "Telegram Msg ID", "type": "string" }
+        { "key": "telegram_msg_id", "label": "Telegram Msg ID", "type": "string" },
+        { "key": "telegram_groups", "label": "Telegram Groups", "type": "string" }
     ],
     "trade_types": [
         "INTRADAY",

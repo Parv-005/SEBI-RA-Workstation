@@ -86,6 +86,7 @@ def get_trade(trade_code: str) -> dict | None:
 def get_all_trades(filters: dict | None = None) -> list[dict]:
     try:
         rows = _get_cached_rows(TRADES_PATH, TRADES_HEADERS, is_trades=True)
+        logger.debug(f"get_all_trades: filters={filters}, total_rows={len(rows)}")
 
         if filters:
             if filters.get("status"):
@@ -124,6 +125,7 @@ def update_trade(trade_code: str, fields: dict) -> bool:
         headers = [c.value for c in ws[1]]
         if not any(headers):
             headers = TRADES_HEADERS
+            logger.warning("Empty header row detected in trades.xlsx, using default headers")
 
         row_arr = map_trade_to_columns(trade_data, headers, is_google_sheets=False)
 

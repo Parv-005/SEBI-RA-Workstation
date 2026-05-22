@@ -15,7 +15,11 @@ from services.trade_service import (
     compute_update_fields, to_display_action,
     BLOCK_ON_MISSING_EXIT_PRICE
 )
+from services.results import build_broadcast_summary, build_broadcast_detail
+from utils.logger import setup_logger
 from database.db_manager import get_trade, get_trade_updates, insert_trade_update
+
+logger = setup_logger("UpdateDialog")
 from database.updates_db import get_formatted_updates_text
 from database.trades_db import update_trade
 
@@ -272,6 +276,7 @@ class UpdateDialog(QDialog):
         self._submit_btn.setEnabled(False)
         self._submit_btn.setText("Processing...")
 
+        logger.info(f"Update submitted: trade={self.trade.get('trade_code')}, type={update_type}")
         self._controller.update_trade_and_broadcast(
             self.trade, update_type, dynamic_values, remarks
         )
@@ -288,28 +293,22 @@ class UpdateDialog(QDialog):
         self._submit_btn.setEnabled(True)
         self._submit_btn.setText("Broadcast Update")
 
-        parts = []
-        if result.image_success:
-            parts.append("Image generated")
-        if result.sheets_success is True:
-            parts.append("Google Sheets updated")
-        elif result.sheets_success == "not_configured":
-            parts.append("Sheets not configured")
-        if result.telegram_success is True:
-            parts.append("Telegram sent")
-        elif result.telegram_success == "not_configured":
-            parts.append("Telegram not configured")
-        elif result.telegram_success == "not_authorized":
-            parts.append("Telegram not authorized")
+        summary = build_broadcast_summary(result)
 
-        summary = " | ".join(parts)
-
-        if result.errors:
+        logger.info(f"Update broadcast complete: image={result.image_success} sheets={result.sheets_success} telegram={result.telegram_success} errors={result.errors} failures={result.telegram_failures}")
+        has_issues = result.errors or result.telegram_failures or not result.sheets_success
+        if has_issues:
             self._signals.notification.emit(
                 f"Update submitted with issues: {summary}",
                 ToastWidget.WARNING,
                 5000,
             )
+            detail_lines = build_broadcast_detail(result)
+            if detail_lines:
+                QMessageBox.warning(
+                    self, "Broadcast Issues",
+                    "\n".join(detail_lines)
+                )
         else:
             self._signals.notification.emit(
                 f"Trade updated successfully! {summary}",

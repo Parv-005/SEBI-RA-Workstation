@@ -10,6 +10,9 @@ from gui.signals import get_signals
 from gui.widgets.sidebar import Sidebar
 from gui.widgets.toast import ToastManager, ToastWidget
 from gui.theme import apply_theme
+from utils.logger import setup_logger
+
+logger = setup_logger("App")
 
 
 class MainWindow(QMainWindow):
@@ -121,10 +124,12 @@ class MainWindow(QMainWindow):
                 from gui.views.trade_detail import TradeDetailView
                 return TradeDetailView(self._controller)
         except Exception as e:
+            logger.error(f"Failed to create view '{page_name}': {e}", exc_info=True)
             self._show_critical(f"Failed to create view '{page_name}'", str(e))
             return None
 
     def _navigate_to(self, page_name, data):
+        logger.debug(f"Navigating to: {page_name}")
         try:
             if page_name == self.PAGE_TRADE_DETAIL:
                 if page_name in self._views:
@@ -151,6 +156,7 @@ class MainWindow(QMainWindow):
 
             self._reposition_toasts()
         except Exception as e:
+            logger.error(f"Navigation error to {page_name}: {e}", exc_info=True)
             self._show_critical("Navigation error", str(e))
 
     def _show_notification(self, message, level, duration_ms):

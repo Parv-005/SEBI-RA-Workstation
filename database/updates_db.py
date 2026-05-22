@@ -97,8 +97,8 @@ def insert_trade_update(update_data: dict) -> None:
 
 
 def get_trade_updates(trade_code: str) -> list[dict]:
-    """Return all updates for a trade, sorted latest-first."""
     try:
+        logger.debug(f"Fetching updates for trade: {trade_code}")
         rows = _get_cached_rows(UPDATES_PATH, UPDATES_HEADERS, is_trades=False)
         filtered = [r for r in rows if r.get("trade_code") == trade_code]
         filtered.sort(key=lambda r: r.get("created_at") or "", reverse=True)

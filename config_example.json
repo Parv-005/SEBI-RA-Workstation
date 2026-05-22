@@ -3,7 +3,9 @@
         "api_id": "",
         "api_hash": "",
         "phone": "",
-        "group_id": ""
+        "groups": {
+            "Default": ""
+        }
     },
     "angelone": {
         "api_key": "",

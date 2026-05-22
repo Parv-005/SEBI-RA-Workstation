@@ -7,6 +7,9 @@ from PySide6.QtGui import QFont
 
 from gui.theme import get_color, current_theme, apply_theme
 from gui.signals import get_signals
+from utils.logger import setup_logger
+
+logger = setup_logger("Sidebar")
 
 
 class Sidebar(QFrame):

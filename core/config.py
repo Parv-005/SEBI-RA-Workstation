@@ -3,6 +3,9 @@ from functools import lru_cache
 from typing import Any
 
 from core.paths import CONFIG_PATH
+from utils.logger import setup_logger
+
+logger = setup_logger("Config")
 
 
 class Config:
@@ -12,25 +15,32 @@ class Config:
     @lru_cache(maxsize=1)
     def get(cls) -> dict[str, Any]:
         if cls._cache is not None:
+            logger.debug("Config cache hit")
             return cls._cache
+        logger.debug("Config cache miss, loading from file")
         return cls._load()
 
     @classmethod
     def _load(cls) -> dict[str, Any]:
         if not CONFIG_PATH.exists():
+            logger.warning(f"Config file not found at {CONFIG_PATH}, using empty defaults")
             return {}
         try:
             with open(CONFIG_PATH) as f:
                 cls._cache = json.load(f)
+                logger.info(f"Config loaded from {CONFIG_PATH}")
                 return cls._cache
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error(f"Failed to parse config.json: {e}", exc_info=True)
             return {}
 
     @classmethod
     def reload(cls):
+        logger.debug("Config reload requested")
         cls.get.cache_clear()
         cls._cache = None
         cls.get()
+
 
     @classmethod
     def get_section(cls, section: str) -> dict[str, Any]:

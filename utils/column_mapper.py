@@ -77,7 +77,8 @@ def map_trade_to_columns(
                     format_kwargs.update(column_letters)
                     try:
                         val = template.format(**format_kwargs)
-                    except KeyError:
+                    except KeyError as e:
+                        logger.warning(f"Formula template key error for '{header}': missing key {e}")
                         val = ""
                 else:
                     val = ""
@@ -108,6 +109,7 @@ def map_trade_to_columns(
             # Fallback for old/unmapped columns
             internal_key = header.lower().replace(" ", "_").replace(":", "_")
             val = trade.get(internal_key, "")
+            logger.debug(f"Unmapped column '{header}', using key '{internal_key}' -> value '{val}'")
 
         row.append(val)
 

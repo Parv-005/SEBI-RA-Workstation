@@ -1,6 +1,18 @@
 import json
 from datetime import datetime
 
+from utils.logger import setup_logger
+
+logger = setup_logger("MessageFormatter")
+
+
+def _safe_float(value, field_name="unknown"):
+    try:
+        return float(value) if value is not None else 0
+    except (ValueError, TypeError):
+        logger.debug(f"Non-numeric value for {field_name}: {value}")
+        raise
+
 
 def format_new_trade(trade: dict) -> str:
     action = trade.get("action", "—")
@@ -9,7 +21,7 @@ def format_new_trade(trade: dict) -> str:
     stock_name = trade.get("stock_name", "—")
 
     try:
-        entry_price_fmt = f"₹{float(trade.get('entry_price', 0)):.2f}"
+        entry_price_fmt = f"₹{_safe_float(trade.get('entry_price'), 'entry_price'):.2f}"
     except (ValueError, TypeError):
         entry_price_fmt = str(trade.get("entry_price", "—"))
 
@@ -20,20 +32,19 @@ def format_new_trade(trade: dict) -> str:
         f"💰 Entry Price : {entry_price_fmt}",
     ]
 
-    # Zone (optional)
     if trade.get("zone_start") and trade.get("zone_end"):
         try:
-            lines.append(f"📍 Entry Zone  : ₹{float(trade['zone_start']):.2f} – ₹{float(trade['zone_end']):.2f}")
+            lines.append(f"📍 Entry Zone  : ₹{_safe_float(trade['zone_start'], 'zone_start'):.2f} – ₹{_safe_float(trade['zone_end'], 'zone_end'):.2f}")
         except (ValueError, TypeError):
             lines.append(f"📍 Entry Zone  : {trade['zone_start']} – {trade['zone_end']}")
 
     try:
-        tgt_fmt = f"₹{float(trade.get('target', 0)):.2f}"
+        tgt_fmt = f"₹{_safe_float(trade.get('target'), 'target'):.2f}"
     except (ValueError, TypeError):
         tgt_fmt = str(trade.get('target', '—'))
 
     try:
-        sl_fmt = f"₹{float(trade.get('stop_loss', 0)):.2f}"
+        sl_fmt = f"₹{_safe_float(trade.get('stop_loss'), 'stop_loss'):.2f}"
     except (ValueError, TypeError):
         sl_fmt = str(trade.get('stop_loss', '—'))
 
@@ -50,10 +61,10 @@ def format_new_trade(trade: dict) -> str:
 
     lines.append(f"━━━━━━━━━━━━━━━━━━━━")
 
-    if trade.get("reward") or trade.get("risk"):
+    if trade.get("reward") is not None or trade.get("risk") is not None:
         try:
-            reward_fmt = f"₹{float(trade.get('reward', 0)):.2f} ({float(trade.get('reward_pct', 0)):.2f}%)"
-            risk_fmt = f"₹{float(trade.get('risk', 0)):.2f} ({float(trade.get('risk_pct', 0)):.2f}%)"
+            reward_fmt = f"₹{_safe_float(trade.get('reward'), 'reward'):.2f} ({_safe_float(trade.get('reward_pct'), 'reward_pct'):.2f}%)"
+            risk_fmt = f"₹{_safe_float(trade.get('risk'), 'risk'):.2f} ({_safe_float(trade.get('risk_pct'), 'risk_pct'):.2f}%)"
         except (ValueError, TypeError):
             reward_fmt = str(trade.get("reward", "—"))
             risk_fmt = str(trade.get("risk", "—"))
@@ -68,7 +79,7 @@ def format_new_trade(trade: dict) -> str:
 
     if trade.get("cmp_at_entry"):
         try:
-            cmp_fmt = f"₹{float(trade['cmp_at_entry']):.2f}"
+            cmp_fmt = f"₹{_safe_float(trade['cmp_at_entry'], 'cmp_at_entry'):.2f}"
         except (ValueError, TypeError):
             cmp_fmt = str(trade['cmp_at_entry'])
         lines.append(f"📈 CMP         : {cmp_fmt}")
@@ -83,6 +94,7 @@ def format_new_trade(trade: dict) -> str:
         dt = datetime.strptime(str(ts), "%Y-%m-%d %H:%M:%S")
         ts_fmt = dt.strftime("%d-%b-%Y %I:%M %p")
     except Exception:
+        logger.debug(f"Could not parse timestamp: {ts}")
         ts_fmt = str(ts)
     lines.append(f"🕐 {ts_fmt}")
 
@@ -100,7 +112,7 @@ def format_trade_update(trade: dict, update: dict) -> str:
     segment = trade.get('segment', '—')
     action = trade.get('action', '—')
     try:
-        entry_price = f"₹{float(trade.get('entry_price', 0)):.2f}"
+        entry_price = f"₹{_safe_float(trade.get('entry_price'), 'entry_price'):.2f}"
     except (ValueError, TypeError):
         entry_price = str(trade.get('entry_price', '—'))
 
@@ -121,11 +133,13 @@ def format_trade_update(trade: dict, update: dict) -> str:
         try:
             new_val = json.loads(new_val) if new_val else {}
         except Exception:
+            logger.debug(f"Could not parse new_value JSON: {new_val}")
             new_val = {}
     if isinstance(old_val, str):
         try:
             old_val = json.loads(old_val) if old_val else {}
         except Exception:
+            logger.debug(f"Could not parse old_value JSON: {old_val}")
             old_val = {}
             
     if new_val:

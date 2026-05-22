@@ -1,25 +1,23 @@
 import asyncio
 import concurrent.futures
 
+from utils.logger import setup_logger
+
+logger = setup_logger("AsyncHelper")
 _thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 
 def run_async(coro):
-    """
-    Execute an async coroutine in a new event loop within a thread pool.
-    Properly handles cleanup of the event loop to avoid resource leaks.
-
-    Usage:
-        async def my_async_func():
-            await something()
-            return result
-
-        result = run_async(my_async_func())
-    """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    logger.debug("Running async coroutine")
     try:
-        return loop.run_until_complete(coro)
+        result = loop.run_until_complete(coro)
+        logger.debug("Async coroutine completed")
+        return result
+    except Exception as e:
+        logger.error(f"Async coroutine failed: {e}", exc_info=True)
+        raise
     finally:
         loop.close()
 

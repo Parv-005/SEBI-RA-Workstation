@@ -10,6 +10,9 @@ from gui.signals import get_signals
 from gui.theme import get_color
 from gui.widgets.toast import ToastWidget
 from utils.constants import STATUSES, STATUS_COLORS, ACTION_COLORS
+from utils.logger import setup_logger
+
+logger = setup_logger("TradeList")
 
 
 class TradeListView(QWidget):
@@ -110,13 +113,17 @@ class TradeListView(QWidget):
     def _do_refresh(self):
         try:
             trades = self._controller.get_trades()
-        except Exception:
+        except Exception as e:
+            logger.error(f"Controller get_trades failed: {e}", exc_info=True)
             trades = []
             from database.db_manager import get_all_trades
             try:
                 trades = get_all_trades()
-            except Exception:
-                pass
+            except Exception as e2:
+                logger.error(f"Direct DB fallback also failed: {e2}", exc_info=True)
+                self._signals.notification.emit(
+                    f"Failed to load trades: {e2}", ToastWidget.ERROR, 5000
+                )
         self._on_trades_loaded(trades)
 
     def _on_trades_loaded(self, trades):
@@ -146,4 +153,5 @@ class TradeListView(QWidget):
         source_index = self._proxy.mapToSource(proxy_index)
         trade = self._model.trade_at(source_index.row())
         if trade:
+            logger.debug(f"Trade selected: {trade.get('trade_code')}")
             self._signals.navigate.emit("trade_detail", trade)

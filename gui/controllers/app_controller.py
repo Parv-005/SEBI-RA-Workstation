@@ -1,4 +1,5 @@
 import traceback
+import json
 from PySide6.QtCore import QObject, QThreadPool
 from PySide6.QtWidgets import QApplication
 
@@ -28,6 +29,72 @@ import asyncio
 logger = setup_logger("AppController")
 
 
+def _parse_telegram_msg_ids(raw: str | None) -> dict[str, int] | None:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    try:
+        return {"Default": int(raw)}
+    except (ValueError, TypeError):
+        return None
+
+
+def _load_config_groups() -> dict[str, str]:
+    try:
+        from core.paths import CONFIG_PATH
+        if CONFIG_PATH.exists():
+            with open(CONFIG_PATH) as f:
+                cfg = json.load(f)
+            return cfg.get("telegram", {}).get("groups", {})
+    except Exception:
+        pass
+    return {}
+
+
+def _build_update_targets(trade_code: str, config_groups: dict[str, str]):
+    fresh = get_trade(trade_code)
+    if not fresh:
+        return None, None
+
+    groups_raw = fresh.get("telegram_groups", "") or ""
+    msg_id_raw = fresh.get("telegram_msg_id", "") or ""
+
+    msg_ids = _parse_telegram_msg_ids(msg_id_raw)
+    if not msg_ids:
+        return None, None
+
+    names = [n.strip() for n in groups_raw.split(",") if n.strip()]
+    if not names:
+        names = list(msg_ids.keys())
+
+    groups = {}
+    reply_to_map = {}
+    for name in names:
+        gid = config_groups.get(name)
+        if gid is not None and name in msg_ids:
+            groups[name] = gid
+            reply_to_map[name] = msg_ids[name]
+
+    if not groups:
+        return None, None
+    return groups, reply_to_map
+
+
+def _sync_telegram_to_sheets(gs: GoogleSheetsService, trade_code: str, telegram_fields: dict, result: BroadcastResult):
+    try:
+        if gs and gs.is_configured():
+            if not gs.sheet:
+                gs.connect()
+            gs.update_trade_row(trade_code, telegram_fields)
+            logger.info(f"Synced telegram data to Google Sheets for {trade_code}")
+    except Exception as e:
+        logger.warning(f"Failed to sync telegram data to Google Sheets: {e}")
+        result.errors.append(f"Sheets telegram sync: {e}")
+
+
 class AppController(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -41,6 +108,7 @@ class AppController(QObject):
     def get_trades(self, filters=None):
         try:
             trades = get_all_trades(filters) if filters else get_all_trades()
+            logger.debug(f"get_trades: filters={filters}, returned {len(trades)} trades")
             self.signals.trades_loaded.emit(trades)
             return trades
         except Exception as e:
@@ -66,17 +134,19 @@ class AppController(QObject):
             self.signals.trade_create_error.emit(str(e))
             return None, None
 
-    def create_trade_and_broadcast(self, trade_data):
+    def create_trade_and_broadcast(self, trade_data, selected_groups=None):
         trade_code, enriched = self.create_trade(trade_data)
         if not trade_code:
             return
-        worker = Worker(self._do_broadcast_new_trade, enriched)
+        logger.info(f"Broadcasting new trade: {trade_code}, groups={list(selected_groups.keys()) if selected_groups else 'default'}")
+        worker = Worker(self._do_broadcast_new_trade, enriched, selected_groups)
         worker.signals.done.connect(self._on_broadcast_done)
         worker.signals.error.connect(self._on_broadcast_error)
         self._pool.start(worker)
 
-    def _do_broadcast_new_trade(self, trade):
+    def _do_broadcast_new_trade(self, trade, selected_groups=None):
         result = BroadcastResult()
+        gs = None
         try:
             img = ImageGenerator()
             img_path = img.generate_trade_image(trade)
@@ -96,36 +166,83 @@ class AppController(QObject):
                 result.sheets_success = "not_configured"
         except Exception as e:
             result.errors.append(f"Sheets: {e}")
+            logger.error(f"Sheets broadcast failed in new_trade: {e}", exc_info=True)
 
         try:
             tg = TelegramService()
             if tg.is_configured():
+                if selected_groups:
+                    async def _send():
+                        try:
+                            authed = await tg.connect()
+                            if not authed:
+                                return "not_authorized"
+                            msg = format_new_trade(trade)
+                            msg_ids, failures = await tg.send_to_groups(msg, selected_groups, result.image_path)
+                            return ("multi", msg_ids, failures)
+                        finally:
+                            await tg.disconnect()
 
-                async def _send():
-                    authed = await tg.connect()
-                    if not authed:
-                        return "not_authorized"
-                    msg = format_new_trade(trade)
-                    msg_id = await tg.send_trade_message(msg, result.image_path)
-                    await tg.disconnect()
-                    return msg_id
-
-                tg_result = run_async(_send())
-                if isinstance(tg_result, int):
-                    result.telegram_success = True
-                    result.telegram_msg_id = tg_result
-                    try:
-                        update_trade(trade["trade_code"], {"telegram_msg_id": str(tg_result)})
-                    except Exception as e:
-                        logger.warning(f"Failed to persist telegram_msg_id: {e}")
-                elif tg_result == "not_authorized":
-                    result.telegram_success = "not_authorized"
+                    tg_result = run_async(_send())
+                    if isinstance(tg_result, tuple) and tg_result[0] == "multi":
+                        msg_ids = tg_result[1]
+                        failures = tg_result[2]
+                        if msg_ids:
+                            result.telegram_success = True
+                            result.telegram_msg_ids = msg_ids
+                            telegram_fields = {
+                                "telegram_msg_id": json.dumps(msg_ids),
+                                "telegram_groups": ", ".join(msg_ids.keys())
+                            }
+                            try:
+                                update_trade(trade["trade_code"], telegram_fields)
+                            except Exception as e:
+                                logger.warning(f"Failed to persist telegram data: {e}")
+                            _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
+                        if failures:
+                            result.telegram_failures = failures
+                            for name, err in failures.items():
+                                result.errors.append(f"Telegram ({name}): {err}")
+                        if not msg_ids and failures:
+                            result.telegram_success = False
+                    elif tg_result == "not_authorized":
+                        result.telegram_success = "not_authorized"
+                    else:
+                        result.telegram_success = bool(tg_result)
                 else:
-                    result.telegram_success = bool(tg_result)
+                    async def _send():
+                        try:
+                            authed = await tg.connect()
+                            if not authed:
+                                return "not_authorized"
+                            msg = format_new_trade(trade)
+                            msg_id = await tg.send_trade_message(msg, result.image_path)
+                            return msg_id
+                        finally:
+                            await tg.disconnect()
+
+                    tg_result = run_async(_send())
+                    if isinstance(tg_result, int):
+                        result.telegram_success = True
+                        result.telegram_msg_ids = {"Default": tg_result}
+                        telegram_fields = {
+                            "telegram_msg_id": str(tg_result),
+                            "telegram_groups": "Default"
+                        }
+                        try:
+                            update_trade(trade["trade_code"], telegram_fields)
+                        except Exception as e:
+                            logger.warning(f"Failed to persist telegram data: {e}")
+                        _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
+                    elif tg_result == "not_authorized":
+                        result.telegram_success = "not_authorized"
+                    else:
+                        result.telegram_success = bool(tg_result)
             else:
                 result.telegram_success = "not_configured"
         except Exception as e:
             result.errors.append(f"Telegram: {e}")
+            logger.error(f"Telegram broadcast failed in new_trade: {e}", exc_info=True)
 
         return result
 
@@ -168,6 +285,7 @@ class AppController(QObject):
 
     def _do_broadcast_update(self, trade, update_data_dict, trade_updates):
         result = BroadcastResult()
+        gs = None
         try:
             img = ImageGenerator()
             img_path = img.generate_update_image(trade, update_data_dict)
@@ -180,52 +298,112 @@ class AppController(QObject):
             gs = GoogleSheetsService()
             if gs.is_configured():
                 gs.connect()
-                gs.update_trade_row(
+                gs_result = gs.update_trade_row(
                     trade["trade_code"], update_data_dict, trade_updates
                 )
-                result.sheets_success = True
+                if gs_result.get("success"):
+                    result.sheets_success = True
+                else:
+                    err_msg = gs_result.get("error", "Failed")
+                    result.sheets_success = False
+                    result.errors.append(f"Sheets: {err_msg}")
+
+                try:
+                    gs.append_update_row(update_data_dict)
+                except Exception as ue:
+                    logger.warning(f"Failed to append update row to Updates sheet: {ue}")
             else:
                 result.sheets_success = "not_configured"
         except Exception as e:
             result.errors.append(f"Sheets: {e}")
+            logger.error(f"Sheets broadcast failed in update: {e}", exc_info=True)
 
         try:
             tg = TelegramService()
             if tg.is_configured():
-                reply_to_id = None
-                fresh_trade = get_trade(trade["trade_code"])
-                raw = fresh_trade.get("telegram_msg_id") if fresh_trade else None
-                if raw:
-                    try:
-                        reply_to_id = int(raw)
-                    except (ValueError, TypeError):
-                        reply_to_id = None
+                config_groups = _load_config_groups()
+                groups, reply_to_map = _build_update_targets(trade["trade_code"], config_groups)
 
-                async def _send():
-                    authed = await tg.connect()
-                    if not authed:
-                        return "not_authorized"
-                    msg = format_trade_update(trade, update_data_dict)
-                    msg_id = await tg.send_update_message(msg, result.image_path, reply_to=reply_to_id)
-                    await tg.disconnect()
-                    return msg_id
+                if groups:
+                    async def _send_multi():
+                        try:
+                            authed = await tg.connect()
+                            if not authed:
+                                return "not_authorized"
+                            msg = format_trade_update(trade, update_data_dict)
+                            msg_ids, failures = await tg.send_to_groups(msg, groups, result.image_path, reply_to_map)
+                            return ("multi", msg_ids, failures)
+                        finally:
+                            await tg.disconnect()
 
-                tg_result = run_async(_send())
-                if isinstance(tg_result, int):
-                    result.telegram_success = True
-                    result.telegram_msg_id = tg_result
-                    try:
-                        update_trade(trade["trade_code"], {"telegram_msg_id": str(tg_result)})
-                    except Exception as e:
-                        logger.warning(f"Failed to persist telegram_msg_id: {e}")
-                elif tg_result == "not_authorized":
-                    result.telegram_success = "not_authorized"
+                    tg_result = run_async(_send_multi())
+                    if isinstance(tg_result, tuple) and tg_result[0] == "multi":
+                        msg_ids = tg_result[1]
+                        failures = tg_result[2]
+                        if msg_ids:
+                            result.telegram_success = True
+                            result.telegram_msg_ids = msg_ids
+                            telegram_fields = {
+                                "telegram_msg_id": json.dumps(msg_ids),
+                                "telegram_groups": ", ".join(msg_ids.keys())
+                            }
+                            try:
+                                update_trade(trade["trade_code"], telegram_fields)
+                            except Exception as e:
+                                logger.warning(f"Failed to persist telegram data: {e}")
+                            _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
+                        if failures:
+                            result.telegram_failures = failures
+                            for name, err in failures.items():
+                                result.errors.append(f"Telegram ({name}): {err}")
+                        if not msg_ids and failures:
+                            result.telegram_success = False
+                    elif tg_result == "not_authorized":
+                        result.telegram_success = "not_authorized"
+                    else:
+                        result.telegram_success = bool(tg_result)
                 else:
-                    result.telegram_success = bool(tg_result)
+                    reply_to_id = None
+                    fresh_trade = get_trade(trade["trade_code"])
+                    raw = fresh_trade.get("telegram_msg_id") if fresh_trade else None
+                    if raw:
+                        parsed = _parse_telegram_msg_ids(raw)
+                        if parsed:
+                            reply_to_id = next(iter(parsed.values()))
+
+                    async def _send_single():
+                        try:
+                            authed = await tg.connect()
+                            if not authed:
+                                return "not_authorized"
+                            msg = format_trade_update(trade, update_data_dict)
+                            msg_id = await tg.send_update_message(msg, result.image_path, reply_to=reply_to_id)
+                            return msg_id
+                        finally:
+                            await tg.disconnect()
+
+                    tg_result = run_async(_send_single())
+                    if isinstance(tg_result, int):
+                        result.telegram_success = True
+                        result.telegram_msg_ids = {"Default": tg_result}
+                        telegram_fields = {
+                            "telegram_msg_id": str(tg_result),
+                            "telegram_groups": "Default"
+                        }
+                        try:
+                            update_trade(trade["trade_code"], telegram_fields)
+                        except Exception as e:
+                            logger.warning(f"Failed to persist telegram data: {e}")
+                        _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
+                    elif tg_result == "not_authorized":
+                        result.telegram_success = "not_authorized"
+                    else:
+                        result.telegram_success = bool(tg_result)
             else:
                 result.telegram_success = "not_configured"
         except Exception as e:
             result.errors.append(f"Telegram: {e}")
+            logger.error(f"Telegram broadcast failed in update: {e}", exc_info=True)
 
         return result
 
@@ -269,6 +447,7 @@ class AppController(QObject):
     def save_settings(self, config_dict):
         try:
             save_config(config_dict)
+            Config.reload()
             self.signals.settings_saved.emit()
         except Exception as e:
             self.signals.settings_error.emit(str(e))

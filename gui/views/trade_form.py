@@ -11,9 +11,14 @@ from gui.signals import get_signals
 from gui.theme import get_color
 from gui.widgets.toast import ToastWidget
 from gui.widgets.section_card import SectionCard
+from gui.widgets.group_select_dialog import GroupSelectDialog
 from services.trade_service import calculate_risk_reward, to_db_action, to_display_action
+from services.results import build_broadcast_summary, build_broadcast_detail
 from utils.constants import SEGMENTS, ACTION_DISPLAY, ACTION_COLORS, TRADE_TYPES
+from utils.logger import setup_logger
+from core.config import Config
 
+logger = setup_logger("TradeForm")
 _GOLD = "#D4AF37"
 _GOLD_HOVER = "#E6C24F"
 
@@ -78,9 +83,10 @@ class NewTradeView(QWidget):
 
         # Fixed footer — always visible, outside scroll area
         footer = QFrame()
+        footer.setObjectName("form_footer")
         footer.setStyleSheet(
-            f"background-color: {get_color('surface')}; "
-            f"border-top: 1px solid {get_color('border')};"
+            f"#form_footer {{ background-color: {get_color('surface')}; "
+            f"border-top: 1px solid {get_color('border')}; }}"
         )
         footer.setMinimumHeight(72)
         footer.setMaximumHeight(72)
@@ -321,9 +327,11 @@ class NewTradeView(QWidget):
             target = float(self._target_price.text()) if self._target_price.text() else 0
             sl = float(self._stop_loss.text()) if self._stop_loss.text() else 0
         except (ValueError, TypeError):
+            logger.debug("RR calc skipped: non-numeric input")
             return
 
         if entry <= 0 or target <= 0 or sl <= 0:
+            logger.debug(f"RR calc skipped: invalid prices entry={entry} target={target} sl={sl}")
             return
 
         result = self._controller.calculate_rr(action, entry, target, sl)
@@ -360,6 +368,7 @@ class NewTradeView(QWidget):
 
         text = sender.text().strip()
         if not text or entry <= 0:
+            logger.debug(f"Zone offset not applied: text='{text}' entry={entry}")
             return
 
         match_pct = re.match(r'^[+\-]\d+(\.\d+)?%$', text)
@@ -394,9 +403,11 @@ class NewTradeView(QWidget):
             QMessageBox.warning(self, "Warning", "Enter a stock symbol first.")
             return
 
+        segment = self._segment_combo.currentText()
+        logger.debug(f"Fetching CMP for '{stock}' in {segment}")
         self._fetch_cmp_btn.setEnabled(False)
         self._fetch_cmp_btn.setText("Fetching...")
-        self._controller.fetch_cmp(stock, self._segment_combo.currentText())
+        self._controller.fetch_cmp(stock, segment)
 
     def _on_cmp_fetched(self, ltp):
         self._entry_price.setText(f"{ltp:.2f}")
@@ -419,15 +430,28 @@ class NewTradeView(QWidget):
         if not trade_data:
             return
 
+        telegram_config = Config.get_section("telegram")
+        groups = telegram_config.get("groups", {})
+        selected_groups = None
+        if groups:
+            dialog = GroupSelectDialog(groups, self)
+            if dialog.exec() == GroupSelectDialog.Accepted:
+                selected_groups = dialog.get_selected_groups()
+            if not selected_groups:
+                logger.info("Trade submit cancelled: no groups selected")
+                return
+
+        logger.info(f"Submitting trade: stock={trade_data.get('stock_name')}, groups={list(selected_groups.keys()) if selected_groups else 'default'}")
         self._is_submitting = True
         self._submit_btn.setEnabled(False)
         self._submit_btn.setText("Submitting...")
 
-        self._controller.create_trade_and_broadcast(trade_data)
+        self._controller.create_trade_and_broadcast(trade_data, selected_groups)
 
     def _validate_and_build(self):
         stock = self._stock_entry.text().strip()
         if not stock:
+            logger.debug("Validation failed: empty stock symbol")
             QMessageBox.warning(self, "Validation Error",
                                 "Stock / Symbol is required.")
             self._stock_entry.setFocus()
@@ -438,23 +462,27 @@ class NewTradeView(QWidget):
             target = float(self._target_price.text()) if self._target_price.text() else 0
             sl = float(self._stop_loss.text()) if self._stop_loss.text() else 0
         except (ValueError, TypeError):
+            logger.debug("Validation failed: non-numeric price")
             QMessageBox.warning(self, "Validation Error",
                                 "Entry Price, Target, and Stop Loss must be valid numbers.")
             return None
 
         if entry <= 0:
+            logger.debug(f"Validation failed: entry={entry}")
             QMessageBox.warning(self, "Validation Error",
                                 "Entry Price must be greater than 0.")
             self._entry_price.setFocus()
             return None
 
         if target <= 0:
+            logger.debug(f"Validation failed: target={target}")
             QMessageBox.warning(self, "Validation Error",
                                 "Target must be greater than 0.")
             self._target_price.setFocus()
             return None
 
         if sl <= 0:
+            logger.debug(f"Validation failed: sl={sl}")
             QMessageBox.warning(self, "Validation Error",
                                 "Stop Loss must be greater than 0.")
             self._stop_loss.setFocus()
@@ -462,6 +490,10 @@ class NewTradeView(QWidget):
 
         action_db = to_db_action(self._action_combo.currentText())
         segment = self._segment_combo.currentText()
+
+        rr_result = self._controller.calculate_rr(
+            self._action_combo.currentText(), entry, target, sl
+        )
 
         trade_data = {
             "stock_name": stock,
@@ -478,12 +510,20 @@ class NewTradeView(QWidget):
             "status": "ACTIVE",
         }
 
+        if rr_result:
+            trade_data["reward"] = round(rr_result.reward, 2)
+            trade_data["risk"] = round(rr_result.risk, 2)
+            trade_data["reward_pct"] = round(rr_result.reward_pct, 2)
+            trade_data["risk_pct"] = round(rr_result.risk_pct, 2)
+            trade_data["risk_reward"] = rr_result.risk_reward
+
         return trade_data
 
     def _on_trade_created(self, trade_code):
-        pass
+        logger.debug(f"Trade created signal received: {trade_code}")
 
     def _on_trade_create_error(self, err):
+        logger.error(f"Trade creation failed: {err}")
         self._is_submitting = False
         self._submit_btn.setEnabled(True)
         self._submit_btn.setText("Submit Trade & Broadcast")
@@ -494,33 +534,24 @@ class NewTradeView(QWidget):
         self._submit_btn.setEnabled(True)
         self._submit_btn.setText("Submit Trade & Broadcast")
 
-        parts = []
-        if result.image_success:
-            parts.append("Image generated")
-        if result.sheets_success is True:
-            parts.append("Google Sheets updated")
-        elif result.sheets_success == "not_configured":
-            parts.append("Sheets not configured")
-        elif not result.sheets_success:
-            parts.append("Sheets failed")
-        if result.telegram_success is True:
-            parts.append("Telegram sent")
-        elif result.telegram_success == "not_configured":
-            parts.append("Telegram not configured")
-        elif result.telegram_success == "not_authorized":
-            parts.append("Telegram not authorized")
-        elif not result.telegram_success:
-            parts.append("Telegram failed")
+        summary = build_broadcast_summary(result)
 
-        summary = " | ".join(parts)
-
+        logger.info(f"Broadcast complete: image={result.image_success} sheets={result.sheets_success} telegram={result.telegram_success} errors={result.errors} failures={result.telegram_failures}")
         self._clear_form()
-        if result.errors:
+
+        has_issues = result.errors or result.telegram_failures or not result.sheets_success
+        if has_issues:
             self._signals.notification.emit(
                 f"Trade submitted with issues: {summary}",
                 ToastWidget.WARNING,
                 5000,
             )
+            detail_lines = build_broadcast_detail(result)
+            if detail_lines:
+                QMessageBox.warning(
+                    self, "Broadcast Issues",
+                    "\n".join(detail_lines)
+                )
         else:
             self._signals.notification.emit(
                 f"Trade submitted successfully! {summary}",

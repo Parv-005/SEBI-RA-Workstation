@@ -74,3 +74,14 @@ ACTION_COLORS: dict[str, str] = {
     "SHORT_HOVER": "#c82333",
     "SHORT_HOVER2": "#bd2130",
 }
+
+UPDATE_TYPE_COLORS: dict[str, str] = {
+    "TARGET_HIT": "#28a745",
+    "SL_HIT": "#dc3545",
+    "PARTIAL_PROFIT": "#17a2b8",
+    "TRAIL_SL": "#0f3460",
+    "COST_TO_COST": "#0f3460",
+    "EXIT": "#f0ad4e",
+    "MODIFY_TARGET": "#6c757d",
+    "MODIFY_SL": "#6c757d",
+}

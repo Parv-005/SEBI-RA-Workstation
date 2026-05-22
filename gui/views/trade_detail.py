@@ -12,19 +12,10 @@ from gui.widgets.field_row import FieldRow
 from gui.widgets.section_card import SectionCard
 from gui.widgets.toast import ToastWidget
 from services.trade_service import to_display_action
-from utils.constants import STATUS_COLORS, STATUSES, ACTION_COLORS
+from utils.constants import STATUS_COLORS, STATUSES, ACTION_COLORS, UPDATE_TYPE_COLORS
+from utils.logger import setup_logger
 
-
-UPDATE_TYPE_COLORS = {
-    "TARGET_HIT": "#28a745",
-    "SL_HIT": "#dc3545",
-    "PARTIAL_PROFIT": "#17a2b8",
-    "TRAIL_SL": "#0f3460",
-    "COST_TO_COST": "#0f3460",
-    "EXIT": "#f0ad4e",
-    "MODIFY_TARGET": "#6c757d",
-    "MODIFY_SL": "#6c757d",
-}
+logger = setup_logger("TradeDetail")
 
 REWARD_COLOR = "#28a745"
 RISK_COLOR = "#dc3545"
@@ -100,6 +91,7 @@ class TradeDetailView(QWidget):
             self._load_detail(self._trade)
 
     def _load_detail(self, trade):
+        logger.debug(f"Loading detail for trade: {trade.get('trade_code')}")
         self._controller.get_trade_by_code(trade.get("trade_code"))
 
     def _on_detail_loaded(self, trade, updates):
@@ -225,7 +217,20 @@ class TradeDetailView(QWidget):
         left2_layout.addWidget(FieldRow("Stop Loss", sl_str))
         zone_start = trade.get("zone_start") or ""
         zone_end = trade.get("zone_end") or ""
-        zone_str = f"{zone_start} \u2013 {zone_end}" if zone_start and zone_end else "\u2014"
+        if zone_start and zone_end:
+            try:
+                zs = float(zone_start)
+                zone_start_str = f"\u20b9{zs:,.2f}"
+            except (ValueError, TypeError):
+                zone_start_str = zone_start
+            try:
+                ze = float(zone_end)
+                zone_end_str = f"\u20b9{ze:,.2f}"
+            except (ValueError, TypeError):
+                zone_end_str = zone_end
+            zone_str = f"{zone_start_str} \u2013 {zone_end_str}"
+        else:
+            zone_str = "\u2014"
         left2_layout.addWidget(FieldRow("Zone", zone_str))
 
         right2_layout.addWidget(FieldRow("Latest SL", latest_sl_str))
@@ -389,6 +394,7 @@ class TradeDetailView(QWidget):
         if not self._trade:
             return
 
+        logger.debug(f"Opening update dialog for trade: {self._trade.get('trade_code')}")
         from gui.views.update_dialog import UpdateDialog
         dialog = UpdateDialog(self._trade, self._controller, self)
         dialog.finished.connect(self._on_update_dialog_finished)

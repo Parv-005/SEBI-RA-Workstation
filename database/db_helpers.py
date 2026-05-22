@@ -49,8 +49,10 @@ def _get_cached_rows(path, headers, is_trades=True):
     with _cache_lock:
         cached = _cache[cache_key]
         if cached["data"] is not None and cached["mtime"] == mtime:
+            logger.debug(f"Cache hit for {cache_key}")
             return cached["data"]
 
+    logger.debug(f"Cache miss for {cache_key}, reloading from file")
     wb = _load_wb(path, headers)
     ws = wb.active
     rows = _wb_to_dicts(ws, headers, is_trades=is_trades)

@@ -28,9 +28,11 @@ def _load_settings() -> dict:
     if SETTINGS_PATH.exists():
         try:
             with open(SETTINGS_PATH) as f:
-                return json.load(f)
-        except Exception:
-            pass
+                data = json.load(f)
+                logger.debug(f"Settings loaded from {SETTINGS_PATH}")
+                return data
+        except Exception as e:
+            logger.error(f"Failed to load settings from {SETTINGS_PATH}: {e}", exc_info=True)
     return {}
 
 

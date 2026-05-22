@@ -195,6 +195,8 @@ class GoogleSheetsService:
                         break
                     except ValueError:
                         continue
+                else:
+                    logger.warning(f"Could not map key '{key}' to any column in Google Sheets. Headers tried: {header_names_to_try}")
 
             logger.info(f"Updated trade {trade_code} row in Google Sheets.")
             result["success"] = True
@@ -203,6 +205,18 @@ class GoogleSheetsService:
             result["error"] = str(e)
 
         return result
+
+    def close(self):
+        if self.client:
+            try:
+                self.client.session.close()
+                logger.info("Google Sheets client closed.")
+            except Exception as e:
+                logger.error(f"Error closing Google Sheets client: {e}", exc_info=True)
+            finally:
+                self.client = None
+                self.sheet = None
+                self.updates_sheet = None
 
     # ── Updates sheet operations ──────────────────────────────────────────────
 
