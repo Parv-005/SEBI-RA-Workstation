@@ -400,7 +400,7 @@ class NewTradeView(QWidget):
     def _on_fetch_cmp(self):
         stock = self._stock_entry.text().strip()
         if not stock:
-            QMessageBox.warning(self, "Warning", "Enter a stock symbol first.")
+            QMessageBox.warning(self.window(), "Warning", "Enter a stock symbol first.")
             return
 
         segment = self._segment_combo.currentText()
@@ -420,7 +420,7 @@ class NewTradeView(QWidget):
     def _on_cmp_fetch_error(self, err):
         self._fetch_cmp_btn.setEnabled(True)
         self._fetch_cmp_btn.setText("Fetch CMP")
-        QMessageBox.warning(self, "CMP Fetch Error", err)
+        QMessageBox.warning(self.window(), "CMP Fetch Error", err)
 
     def _on_submit(self):
         if self._is_submitting:
@@ -452,7 +452,7 @@ class NewTradeView(QWidget):
         stock = self._stock_entry.text().strip()
         if not stock:
             logger.debug("Validation failed: empty stock symbol")
-            QMessageBox.warning(self, "Validation Error",
+            QMessageBox.warning(self.window(), "Validation Error",
                                 "Stock / Symbol is required.")
             self._stock_entry.setFocus()
             return None
@@ -463,27 +463,27 @@ class NewTradeView(QWidget):
             sl = float(self._stop_loss.text()) if self._stop_loss.text() else 0
         except (ValueError, TypeError):
             logger.debug("Validation failed: non-numeric price")
-            QMessageBox.warning(self, "Validation Error",
+            QMessageBox.warning(self.window(), "Validation Error",
                                 "Entry Price, Target, and Stop Loss must be valid numbers.")
             return None
 
         if entry <= 0:
             logger.debug(f"Validation failed: entry={entry}")
-            QMessageBox.warning(self, "Validation Error",
+            QMessageBox.warning(self.window(), "Validation Error",
                                 "Entry Price must be greater than 0.")
             self._entry_price.setFocus()
             return None
 
         if target <= 0:
             logger.debug(f"Validation failed: target={target}")
-            QMessageBox.warning(self, "Validation Error",
+            QMessageBox.warning(self.window(), "Validation Error",
                                 "Target must be greater than 0.")
             self._target_price.setFocus()
             return None
 
         if sl <= 0:
             logger.debug(f"Validation failed: sl={sl}")
-            QMessageBox.warning(self, "Validation Error",
+            QMessageBox.warning(self.window(), "Validation Error",
                                 "Stop Loss must be greater than 0.")
             self._stop_loss.setFocus()
             return None
@@ -527,7 +527,7 @@ class NewTradeView(QWidget):
         self._is_submitting = False
         self._submit_btn.setEnabled(True)
         self._submit_btn.setText("Submit Trade & Broadcast")
-        QMessageBox.critical(self, "Error", f"Failed to save trade:\n{err}")
+        QMessageBox.critical(self.window(), "Error", f"Failed to save trade:\n{err}")
 
     def _on_broadcast_complete(self, result):
         self._is_submitting = False
@@ -549,7 +549,7 @@ class NewTradeView(QWidget):
             detail_lines = build_broadcast_detail(result)
             if detail_lines:
                 QMessageBox.warning(
-                    self, "Broadcast Issues",
+                    self.window(), "Broadcast Issues",
                     "\n".join(detail_lines)
                 )
         else:

@@ -57,7 +57,7 @@ def insert_trade(trade_data: dict) -> tuple[str, dict]:
         trade_code = _unique_trade_code(existing_codes)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        enriched = {**trade_data, "trade_code": trade_code, "created_at": now, "updated_at": now}
+        enriched = {**trade_data, "trade_code": trade_code, "created_at": now, "updated_at": ""}
 
         row = map_trade_to_columns(enriched, headers, is_google_sheets=False)
         ws.append(row)

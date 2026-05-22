@@ -190,6 +190,8 @@ class GoogleSheetsService:
                 for h_name in header_names_to_try:
                     try:
                         col_idx = headers.index(h_name) + 1
+                        if key in ("exit_price", "exit_datetime"):
+                            logger.debug(f"Writing {key} = {val!r} (type={type(val).__name__}) to column '{h_name}' (col {col_idx})")
                         self.sheet.update_cell(row_num, col_idx, val)
                         result["updated_keys"].append(key)
                         break

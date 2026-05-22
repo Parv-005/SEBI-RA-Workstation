@@ -171,8 +171,9 @@ class TradeDetailView(QWidget):
         right1_layout.addWidget(FieldRow("Status", status_text, status_color))
         created_at = str(trade.get("created_at") or "\u2014").split(".")[0]
         right1_layout.addWidget(FieldRow("Created At", created_at))
-        updated_at = str(trade.get("updated_at") or "\u2014").split(".")[0]
-        right1_layout.addWidget(FieldRow("Updated At", updated_at))
+        if updates:
+            latest_update_time = str(updates[0].get("created_at") or "\u2014").split(".")[0]
+            right1_layout.addWidget(FieldRow("Updated At", latest_update_time))
         cmp_at_entry = trade.get("cmp_at_entry")
         cmp_str = f"\u20b9{cmp_at_entry:,.2f}" if isinstance(cmp_at_entry, (int, float)) else "\u2014"
         right1_layout.addWidget(FieldRow("CMP at Entry", cmp_str))

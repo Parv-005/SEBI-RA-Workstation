@@ -251,7 +251,7 @@ class UpdateDialog(QDialog):
                 )
             )
         except ValueError as e:
-            QMessageBox.warning(self, "Validation Error", str(e))
+            QMessageBox.warning(self.window(), "Validation Error", str(e))
             return
 
         if self._close_trade_var and "Exit Price" not in dynamic_values and self._extra_exit_entry:
@@ -287,7 +287,7 @@ class UpdateDialog(QDialog):
     def _on_update_error(self, err):
         self._submit_btn.setEnabled(True)
         self._submit_btn.setText("Broadcast Update")
-        QMessageBox.critical(self, "Error", str(err))
+        QMessageBox.critical(self.window(), "Error", str(err))
 
     def _on_broadcast_complete(self, result):
         self._submit_btn.setEnabled(True)
@@ -306,7 +306,7 @@ class UpdateDialog(QDialog):
             detail_lines = build_broadcast_detail(result)
             if detail_lines:
                 QMessageBox.warning(
-                    self, "Broadcast Issues",
+                    self.window(), "Broadcast Issues",
                     "\n".join(detail_lines)
                 )
         else:

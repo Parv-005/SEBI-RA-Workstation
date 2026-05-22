@@ -30,7 +30,7 @@
             "key": "live_pnl", 
             "label": "Live PNL", 
             "type": "formula", 
-            "template": "=IF(ISBLANK({cmp_col}{row}), \"\", IF({action_col}{row}=\"LONG\", {cmp_col}{row}-{entry_col}{row}, {entry_col}{row}-{cmp_col}{row}))",
+            "template": "=IF(ISBLANK({cmp_col}{row}), \"\", IF({action_col}{row}=\"LONG\", {cmp_col}{row}-{entry_price_col}{row}, {entry_price_col}{row}-{cmp_col}{row}))",
             "dependencies": ["cmp", "action", "entry_price"] 
         },
         { "key": "status", "label": "Status", "type": "string" },

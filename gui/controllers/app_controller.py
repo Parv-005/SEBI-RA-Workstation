@@ -1,5 +1,6 @@
 import traceback
 import json
+from datetime import datetime
 from PySide6.QtCore import QObject, QThreadPool
 from PySide6.QtWidgets import QApplication
 
@@ -267,6 +268,13 @@ class AppController(QObject):
             self.signals.trade_update_error.emit(str(e))
             return
 
+        if not trade_updates:
+            self.signals.trade_update_error.emit("No fields to update.")
+            return
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        trade_updates["updated_at"] = now_str
+
         try:
             insert_trade_update(update_data_dict)
             update_trade(trade["trade_code"], trade_updates)
@@ -274,6 +282,9 @@ class AppController(QObject):
         except Exception as e:
             self.signals.trade_update_error.emit(str(e))
             return
+
+        updates_text = get_formatted_updates_text(trade["trade_code"])
+        trade_updates["updates"] = updates_text
 
         worker = Worker(
             self._do_broadcast_update,
