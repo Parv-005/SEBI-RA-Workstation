@@ -5,6 +5,7 @@ from database.db_helpers import (
     _ensure_data_dir, _load_wb, _save_workbook, _wb_to_dicts,
     _get_cached_rows, invalidate_cache,
 )
+from utils.constants import DATE_FMT_DB
 from utils.logger import setup_logger
 
 logger = setup_logger("UpdatesDB")
@@ -69,7 +70,7 @@ def insert_trade_update(update_data: dict) -> None:
         wb = _load_wb(UPDATES_PATH, UPDATES_HEADERS)
         ws = wb.active
 
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime(DATE_FMT_DB)
 
         old_val = update_data.get("old_value")
         new_val = update_data.get("new_value")

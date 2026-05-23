@@ -14,13 +14,11 @@ from gui.widgets.section_card import SectionCard
 from gui.widgets.group_select_dialog import GroupSelectDialog
 from services.trade_service import calculate_risk_reward, to_db_action, to_display_action
 from services.results import build_broadcast_summary, build_broadcast_detail
-from utils.constants import SEGMENTS, ACTION_DISPLAY, ACTION_COLORS, TRADE_TYPES
+from utils.constants import SEGMENTS, ACTION_DISPLAY, ACTION_COLORS, TRADE_TYPES, COLOR_GOLD, COLOR_GOLD_HOVER
 from utils.logger import setup_logger
 from core.config import Config
 
 logger = setup_logger("TradeForm")
-_GOLD = "#D4AF37"
-_GOLD_HOVER = "#E6C24F"
 
 
 class NewTradeView(QWidget):

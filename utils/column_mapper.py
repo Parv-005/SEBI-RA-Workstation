@@ -4,6 +4,7 @@ Spreadsheet/XLSX header columns. Supports dynamic formulas.
 """
 
 from utils.constants_loader import get_constant
+from utils.constants import STATUS_CLOSED
 from utils.logger import setup_logger
 from string import ascii_uppercase
 
@@ -98,7 +99,7 @@ def map_trade_to_columns(
                 val = trade.get(key, "")
 
                 # special fallback override purely for missing close_narration logic
-                if key == "remarks" and trade.get("status") == "CLOSED":
+                if key == "remarks" and trade.get("status") == STATUS_CLOSED:
                     if trade.get("close_narration"):
                         val = trade.get("close_narration", "")
                         

@@ -1,6 +1,8 @@
 import re
 from dataclasses import dataclass
-from utils.constants import ACTION_DISPLAY_MAP, ACTION_DB_MAP
+from datetime import datetime
+from utils.constants import ACTION_DISPLAY_MAP, ACTION_DB_MAP, DATE_FMT_DB, STATUS_CLOSED
+from utils.formatters import format_risk_reward
 from utils.logger import setup_logger
 
 logger = setup_logger("TradeService")
@@ -33,7 +35,7 @@ def calculate_risk_reward(
         logger.debug(f"RR calc: risk={risk} reward={reward} -> empty ratio")
     else:
         ratio = reward / risk
-        risk_reward_str = f"1 : {ratio:.2f}"
+        risk_reward_str = format_risk_reward(ratio)
 
     return RiskRewardResult(
         reward=reward,
@@ -83,8 +85,8 @@ def compute_update_fields(
 
     # ── Handle trade closure (driven purely by close_trade flag) ──────────────
     if close_trade:
-        trade_updates["status"] = "CLOSED"
-        trade_updates["exit_datetime"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        trade_updates["status"] = STATUS_CLOSED
+        trade_updates["exit_datetime"] = datetime.now().strftime(DATE_FMT_DB)
         trade_updates["close_narration"] = f"[{update_type}] {remarks}"
         logger.debug(f"compute_update_fields: closing trade {trade_code}")
 

@@ -8,6 +8,85 @@ get_constant() directly, eliminating duplicated fallback defaults across files.
 
 from utils.constants_loader import get_constant
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  Date / Time Formats
+# ══════════════════════════════════════════════════════════════════════════════
+
+DATE_FMT_DB = "%Y-%m-%d %H:%M:%S"
+DATE_FMT_COMPACT = "%Y%m%d"
+DATE_FMT_FILENAME = "%Y%m%d_%H%M%S"
+DATE_FMT_DISPLAY = "%d-%b-%Y %I:%M %p"
+DATE_FMT_SHORT = "%d %b %Y"
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Display Symbols
+# ══════════════════════════════════════════════════════════════════════════════
+
+CURRENCY_SYMBOL = get_constant("currency_symbol", "\u20b9")
+EMPTY_PLACEHOLDER = "\u2014"
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Shared Defaults
+# ══════════════════════════════════════════════════════════════════════════════
+
+DEFAULT_ACTION = "LONG"
+STATUS_ACTIVE = "ACTIVE"
+STATUS_CLOSED = "CLOSED"
+
+FILTER_ALL = "ALL"
+
+BROADCAST_NOT_CONFIGURED = "not_configured"
+BROADCAST_NOT_AUTHORIZED = "not_authorized"
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Magic Numbers (runtime-tunable via app_constants.json)
+# ══════════════════════════════════════════════════════════════════════════════
+
+THREAD_POOL_SIZE: int = int(get_constant("thread_pool_size", 4))
+MAX_TRADE_CODE_ATTEMPTS: int = int(get_constant("max_trade_code_attempts", 10))
+AUTH_TIMEOUT_SEC: int = int(get_constant("auth_timeout_sec", 120))
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Emoji
+# ══════════════════════════════════════════════════════════════════════════════
+
+EMOJI = get_constant("emoji", {
+    "LONG": "\U0001f7e2",
+    "SHORT": "\U0001f534",
+    "SEGMENT": "\U0001f4ca",
+    "ENTRY_PRICE": "\U0001f4b0",
+    "ENTRY_ZONE": "\U0001f4cd",
+    "TARGET": "\U0001f3af",
+    "STOP_LOSS": "\U0001f6d1",
+    "TRADE_TYPE": "\U0001f3f7\ufe0f",
+    "APPROX_TIME": "\U0001f570\ufe0f",
+    "REWARD": "\U0001f7e2",
+    "RISK": "\U0001f534",
+    "RISK_REWARD": "\u2696\ufe0f",
+    "CMP": "\U0001f4c8",
+    "REMARKS": "\U0001f4dd",
+    "TIMESTAMP": "\U0001f550",
+    "TRADE_ID": "\U0001f194",
+    "TRADE_UPDATE": "\U0001f4e2",
+    "UPDATE": "\U0001f514",
+    "ACTION": "\U0001f4cc",
+    "FIELD_CHANGE": "\U0001f504",
+    "SEPARATOR": "\u2501" * 20,
+})
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Color Definitions (imported from theme or used standalone)
+# ══════════════════════════════════════════════════════════════════════════════
+
+COLOR_REWARD = "#28a745"
+COLOR_RISK = "#dc3545"
+COLOR_GOLD = "#D4AF37"
+COLOR_GOLD_HOVER = "#E6C24F"
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Business Domain (loaded from app_constants.json)
+# ══════════════════════════════════════════════════════════════════════════════
+
 # ── Segments ──────────────────────────────────────────────
 SEGMENTS: list[str] = get_constant(
     "segments", ["Cash", "F&O", "MCX", "Currency", "Index"],

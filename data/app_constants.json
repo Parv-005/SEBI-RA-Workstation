@@ -16,6 +16,8 @@
         { "key": "risk_reward", "label": "Risk Reward Ratio", "type": "string" },
         { "key": "risk", "label": "Risk", "type": "string" },
         { "key": "reward", "label": "Reward", "type": "string" },
+        { "key": "reward_pct", "label": "Reward %", "type": "string" },
+        { "key": "risk_pct", "label": "Risk %", "type": "string" },
         { "key": "approx_time", "label": "Approx Time", "type": "string" },
         { "key": "target", "label": "Target", "type": "string" },
         { "key": "latest_target", "label": "Latest Target", "type": "string" },

@@ -12,13 +12,14 @@ from gui.widgets.field_row import FieldRow
 from gui.widgets.section_card import SectionCard
 from gui.widgets.toast import ToastWidget
 from services.trade_service import to_display_action
-from utils.constants import STATUS_COLORS, STATUSES, ACTION_COLORS, UPDATE_TYPE_COLORS
+from utils.constants import (
+    STATUS_COLORS, STATUSES, ACTION_COLORS, UPDATE_TYPE_COLORS,
+    COLOR_REWARD, COLOR_RISK, DEFAULT_ACTION, STATUS_CLOSED, EMPTY_PLACEHOLDER,
+)
+from utils.formatters import format_currency, format_date_short, format_date_full, format_percentage, format_risk_reward, format_zone
 from utils.logger import setup_logger
 
 logger = setup_logger("TradeDetail")
-
-REWARD_COLOR = "#28a745"
-RISK_COLOR = "#dc3545"
 
 
 class TradeDetailView(QWidget):
@@ -124,20 +125,20 @@ class TradeDetailView(QWidget):
         summary_layout.setContentsMargins(0, 0, 0, 0)
         summary_layout.setSpacing(12)
 
-        stock = QLabel(trade.get("stock_name") or "\u2014")
+        stock = QLabel(trade.get("stock_name") or EMPTY_PLACEHOLDER)
         stock.setFont(QFont("Segoe UI", 18, QFont.Bold))
         stock.setStyleSheet(f"color: {get_color('text_primary')}; background: transparent;")
         summary_layout.addWidget(stock)
 
-        segment_val = (trade.get("segment") or "\u2014").strip() or "\u2014"
+        segment_val = (trade.get("segment") or EMPTY_PLACEHOLDER).strip() or EMPTY_PLACEHOLDER
         segment_badge = Badge(segment_val, segment_val.upper(), 10)
         summary_layout.addWidget(segment_badge)
 
-        action_display = to_display_action(trade.get("action") or "LONG")
+        action_display = to_display_action(trade.get("action") or DEFAULT_ACTION)
         action_badge = Badge(action_display, action_display, 10)
         summary_layout.addWidget(action_badge)
 
-        status_text = trade.get("status") or "\u2014"
+        status_text = trade.get("status") or EMPTY_PLACEHOLDER
         status_badge = Badge(status_text, status_text, 10)
         summary_layout.addWidget(status_badge)
 
@@ -160,23 +161,21 @@ class TradeDetailView(QWidget):
         right1_layout.setContentsMargins(0, 0, 0, 0)
         right1_layout.setSpacing(2)
 
-        left1_layout.addWidget(FieldRow("Trade Code", trade.get("trade_code") or "\u2014"))
-        left1_layout.addWidget(FieldRow("Stock Name", trade.get("stock_name") or "\u2014"))
-        left1_layout.addWidget(FieldRow("Segment", trade.get("segment") or "\u2014"))
+        left1_layout.addWidget(FieldRow("Trade Code", trade.get("trade_code") or EMPTY_PLACEHOLDER))
+        left1_layout.addWidget(FieldRow("Stock Name", trade.get("stock_name") or EMPTY_PLACEHOLDER))
+        left1_layout.addWidget(FieldRow("Segment", trade.get("segment") or EMPTY_PLACEHOLDER))
         left1_layout.addWidget(FieldRow("Action", action_display))
-        left1_layout.addWidget(FieldRow("Trade Type", trade.get("trade_type") or "\u2014"))
-        left1_layout.addWidget(FieldRow("Approx Time", trade.get("approx_time") or "\u2014"))
+        left1_layout.addWidget(FieldRow("Trade Type", trade.get("trade_type") or EMPTY_PLACEHOLDER))
+        left1_layout.addWidget(FieldRow("Approx Time", trade.get("approx_time") or EMPTY_PLACEHOLDER))
 
         status_color = STATUS_COLORS.get(status_text, "#6c757d")
         right1_layout.addWidget(FieldRow("Status", status_text, status_color))
-        created_at = str(trade.get("created_at") or "\u2014").split(".")[0]
+        created_at = format_date_full(trade.get("created_at"))
         right1_layout.addWidget(FieldRow("Created At", created_at))
         if updates:
-            latest_update_time = str(updates[0].get("created_at") or "\u2014").split(".")[0]
+            latest_update_time = format_date_full(updates[0].get("created_at"))
             right1_layout.addWidget(FieldRow("Updated At", latest_update_time))
-        cmp_at_entry = trade.get("cmp_at_entry")
-        cmp_str = f"\u20b9{cmp_at_entry:,.2f}" if isinstance(cmp_at_entry, (int, float)) else "\u2014"
-        right1_layout.addWidget(FieldRow("CMP at Entry", cmp_str))
+        right1_layout.addWidget(FieldRow("CMP at Entry", format_currency(trade.get("cmp_at_entry"))))
 
         left_right1.addWidget(left1, 1)
         left_right1.addWidget(right1, 1)
@@ -206,39 +205,24 @@ class TradeDetailView(QWidget):
         latest_sl = trade.get("latest_sl_price")
         latest_target = trade.get("latest_target")
 
-        entry_str = f"\u20b9{entry_price:,.2f}" if isinstance(entry_price, (int, float)) else "\u2014"
-        target_str = f"\u20b9{target:,.2f}" if isinstance(target, (int, float)) else "\u2014"
-        sl_str = f"\u20b9{stop_loss:,.2f}" if isinstance(stop_loss, (int, float)) else "\u2014"
-        exit_str = f"\u20b9{exit_price:,.2f}" if isinstance(exit_price, (int, float)) else "\u2014"
-        latest_sl_str = f"\u20b9{latest_sl:,.2f}" if isinstance(latest_sl, (int, float)) else "\u2014"
-        latest_target_str = f"\u20b9{latest_target:,.2f}" if isinstance(latest_target, (int, float)) else "\u2014"
+        entry_str = format_currency(entry_price)
+        target_str = format_currency(target)
+        sl_str = format_currency(stop_loss)
+        exit_str = format_currency(exit_price)
+        latest_sl_str = format_currency(latest_sl)
+        latest_target_str = format_currency(latest_target)
 
         left2_layout.addWidget(FieldRow("Entry Price", entry_str))
         left2_layout.addWidget(FieldRow("Target", target_str))
         left2_layout.addWidget(FieldRow("Stop Loss", sl_str))
-        zone_start = trade.get("zone_start") or ""
-        zone_end = trade.get("zone_end") or ""
-        if zone_start and zone_end:
-            try:
-                zs = float(zone_start)
-                zone_start_str = f"\u20b9{zs:,.2f}"
-            except (ValueError, TypeError):
-                zone_start_str = zone_start
-            try:
-                ze = float(zone_end)
-                zone_end_str = f"\u20b9{ze:,.2f}"
-            except (ValueError, TypeError):
-                zone_end_str = zone_end
-            zone_str = f"{zone_start_str} \u2013 {zone_end_str}"
-        else:
-            zone_str = "\u2014"
+        zone_str = format_zone(trade.get("zone_start"), trade.get("zone_end"))
         left2_layout.addWidget(FieldRow("Zone", zone_str))
 
         right2_layout.addWidget(FieldRow("Latest SL", latest_sl_str))
         right2_layout.addWidget(FieldRow("Latest Target", latest_target_str))
         right2_layout.addWidget(FieldRow("Exit Price", exit_str))
         exit_date = trade.get("exit_datetime") or ""
-        exit_date_str = str(exit_date).split(".")[0] if exit_date else "\u2014"
+        exit_date_str = format_date_full(exit_date) if exit_date else EMPTY_PLACEHOLDER
         right2_layout.addWidget(FieldRow("Exit Date", exit_date_str))
 
         left_right2.addWidget(left2, 1)
@@ -268,21 +252,21 @@ class TradeDetailView(QWidget):
         risk_pct = trade.get("risk_pct")
         rr = trade.get("risk_reward") or ""
 
-        reward_str = f"\u20b9{reward:,.2f}" if isinstance(reward, (int, float)) else "\u2014"
-        risk_str = f"\u20b9{risk:,.2f}" if isinstance(risk, (int, float)) else "\u2014"
-        reward_pct_str = f"{reward_pct:.2f}%" if isinstance(reward_pct, (int, float)) else "\u2014"
-        risk_pct_str = f"{risk_pct:.2f}%" if isinstance(risk_pct, (int, float)) else "\u2014"
+        reward_str = format_currency(reward)
+        risk_str = format_currency(risk)
+        reward_pct_str = format_percentage(reward_pct)
+        risk_pct_str = format_percentage(risk_pct)
 
-        left3_layout.addWidget(FieldRow("Reward", reward_str, REWARD_COLOR))
-        left3_layout.addWidget(FieldRow("Risk", risk_str, RISK_COLOR))
-        right3_layout.addWidget(FieldRow("Reward %", reward_pct_str, REWARD_COLOR))
-        right3_layout.addWidget(FieldRow("Risk %", risk_pct_str, RISK_COLOR))
+        left3_layout.addWidget(FieldRow("Reward", reward_str, COLOR_REWARD))
+        left3_layout.addWidget(FieldRow("Risk", risk_str, COLOR_RISK))
+        right3_layout.addWidget(FieldRow("Reward %", reward_pct_str, COLOR_REWARD))
+        right3_layout.addWidget(FieldRow("Risk %", risk_pct_str, COLOR_RISK))
 
         left_right3.addWidget(left3, 1)
         left_right3.addWidget(right3, 1)
         card3.add_layout(left_right3)
 
-        rr_widget = FieldRow("Risk : Reward", rr if rr else "\u2014")
+        rr_widget = FieldRow("Risk : Reward", rr if rr else EMPTY_PLACEHOLDER)
         rr_container = QWidget()
         rr_container.setStyleSheet("background-color: transparent;")
         rr_container_layout = QHBoxLayout(rr_container)
@@ -324,14 +308,14 @@ class TradeDetailView(QWidget):
                 update_card = self._render_update_card(update, i)
                 self._body_layout.addWidget(update_card)
 
-        is_closed = (trade.get("status") or "").upper() == "CLOSED"
+        is_closed = (trade.get("status") or "").upper() == STATUS_CLOSED
         self._update_btn.setVisible(not is_closed)
 
         self._body_layout.addStretch()
 
     def _render_update_card(self, update, index):
-        update_type = update.get("update_type", "\u2014")
-        created_at = str(update.get("created_at", "")).split(".")[0]
+        update_type = update.get("update_type", EMPTY_PLACEHOLDER)
+        created_at = format_date_full(update.get("created_at"))
         message = update.get("message", "") or update.get("details", "")
         changes = update.get("changes", "")
 

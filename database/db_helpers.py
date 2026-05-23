@@ -1,5 +1,6 @@
 from core.paths import DATA_DIR, TRADES_PATH, UPDATES_PATH
 from utils.column_mapper import DEFAULT_HEADERS, map_row_to_trade
+from utils.constants import DATE_FMT_DB
 from utils.logger import setup_logger
 from openpyxl import load_workbook, Workbook
 from datetime import datetime
@@ -76,7 +77,7 @@ def _wb_to_dicts(ws, headers=None, is_trades=True):
         processed = []
         for v in row:
             if isinstance(v, datetime):
-                processed.append(v.strftime("%Y-%m-%d %H:%M:%S"))
+                processed.append(v.strftime(DATE_FMT_DB))
             else:
                 processed.append(v)
         row_dict = dict(zip(sheet_headers, processed))

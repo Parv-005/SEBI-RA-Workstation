@@ -2,6 +2,8 @@ from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QSortFilterProx
 from PySide6.QtGui import QColor
 
 from services.trade_service import to_display_action
+from utils.constants import EMPTY_PLACEHOLDER, CURRENCY_SYMBOL, DEFAULT_ACTION, FILTER_ALL
+from utils.formatters import format_currency, format_date_short
 
 
 COLUMNS = [
@@ -44,24 +46,22 @@ class TradeTableModel(QAbstractTableModel):
         return None
 
     def _format_price(self, value):
-        if isinstance(value, (int, float)):
-            return f"\u20b9{value:,.2f}"
-        return "\u20b9\u2014"
+        return format_currency(value)
 
     def _build_row(self, trade):
-        date_str = str(trade.get("created_at") or "\u2014").split(" ")[0]
+        date_str = format_date_short(trade.get("created_at"))
         trade_code = trade.get("trade_code") or "?"
-        action_display = to_display_action(trade.get("action") or "LONG")
+        action_display = to_display_action(trade.get("action") or DEFAULT_ACTION)
         entry_str = self._format_price(trade.get("entry_price"))
         target_str = self._format_price(trade.get("target"))
         sl_str = self._format_price(trade.get("stop_loss"))
-        status_text = trade.get("status") or "\u2014"
+        status_text = trade.get("status") or EMPTY_PLACEHOLDER
 
         return (
             trade_code,
             date_str,
-            trade.get("stock_name") or "\u2014",
-            trade.get("segment") or "\u2014",
+            trade.get("stock_name") or EMPTY_PLACEHOLDER,
+            trade.get("segment") or EMPTY_PLACEHOLDER,
             action_display,
             entry_str,
             target_str,
@@ -95,7 +95,7 @@ class TradeFilterModel(QSortFilterProxyModel):
         self.setSortRole(Qt.DisplayRole)
 
     def set_status_filter(self, status):
-        self._status_filter = status if status and status != "ALL" else None
+        self._status_filter = status if status and status != FILTER_ALL else None
         self.invalidateFilter()
 
     def set_search_query(self, query):

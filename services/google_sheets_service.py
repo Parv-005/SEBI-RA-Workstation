@@ -7,6 +7,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from core.paths import CONFIG_PATH
 from services.results import AppendResult
+from utils.constants import DATE_FMT_DB
 from utils.logger import setup_logger
 
 logger = setup_logger("GoogleSheetsService")
@@ -246,7 +247,7 @@ class GoogleSheetsService:
                 update_data.get("update_type", ""),
                 update_data.get("message", update_data.get("details", "")),
                 changes,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.now().strftime(DATE_FMT_DB),
             ]
             self.updates_sheet.append_row(row, value_input_option="USER_ENTERED")
             logger.info(

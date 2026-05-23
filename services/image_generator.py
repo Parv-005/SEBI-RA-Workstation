@@ -5,6 +5,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 from core.paths import CONFIG_PATH, IMAGES_DIR, ROOT_DIR
+from utils.constants import CURRENCY_SYMBOL
 from utils.logger import setup_logger
 
 logger = setup_logger("ImageGenerator")
@@ -61,13 +62,13 @@ class ImageGenerator:
                 "stock_name": trade.get("stock_name", ""),
                 "segment": trade.get("segment", ""),
                 "action": trade.get("action", ""),
-                "entry_price": f"₹{trade.get('entry_price', 0):.2f}",
+                "entry_price": f"{CURRENCY_SYMBOL}{trade.get('entry_price', 0):.2f}",
                 "zone": (
-                    f"₹{float(trade['zone_start']):.2f} – ₹{float(trade['zone_end']):.2f}"
+                    f"{CURRENCY_SYMBOL}{float(trade['zone_start']):.2f} – {CURRENCY_SYMBOL}{float(trade['zone_end']):.2f}"
                     if trade.get("zone_start") and trade.get("zone_end") else ""
                 ),
-                "target": f"₹{trade.get('target', 0):.2f}",
-                "stop_loss": f"₹{trade.get('stop_loss', 0):.2f}",
+                "target": f"{CURRENCY_SYMBOL}{trade.get('target', 0):.2f}",
+                "stop_loss": f"{CURRENCY_SYMBOL}{trade.get('stop_loss', 0):.2f}",
                 "trade_type": trade.get("trade_type", ""),
                 "approx_time": trade.get("approx_time", ""),
                 "reward": f"{trade.get('reward', 0):.2f}",
@@ -142,13 +143,13 @@ class ImageGenerator:
         y = 90
         lines = [
             f"Segment     : {trade.get('segment', '')}",
-            f"Entry Price : ₹{trade.get('entry_price', 0):.2f}",
+            f"Entry Price : {CURRENCY_SYMBOL}{trade.get('entry_price', 0):.2f}",
         ]
         if trade.get("zone_start") and trade.get("zone_end"):
-            lines.append(f"Zone        : ₹{float(trade['zone_start']):.2f} – ₹{float(trade['zone_end']):.2f}")
+            lines.append(f"Zone        : {CURRENCY_SYMBOL}{float(trade['zone_start']):.2f} – {CURRENCY_SYMBOL}{float(trade['zone_end']):.2f}")
         lines += [
-            f"Target      : ₹{trade.get('target', 0):.2f}",
-            f"Stop Loss   : ₹{trade.get('stop_loss', 0):.2f}",
+            f"Target      : {CURRENCY_SYMBOL}{trade.get('target', 0):.2f}",
+            f"Stop Loss   : {CURRENCY_SYMBOL}{trade.get('stop_loss', 0):.2f}",
         ]
         if trade.get("trade_type"):
             lines.append(f"Trade Type  : {trade['trade_type']}")
@@ -156,13 +157,13 @@ class ImageGenerator:
             lines.append(f"Approx Time : {trade['approx_time']}")
 
         lines += [
-            f"Reward      : ₹{trade.get('reward', 0):.2f} ({trade.get('reward_pct', 0):.2f}%)",
-            f"Risk        : ₹{trade.get('risk', 0):.2f} ({trade.get('risk_pct', 0):.2f}%)",
+            f"Reward      : {CURRENCY_SYMBOL}{trade.get('reward', 0):.2f} ({trade.get('reward_pct', 0):.2f}%)",
+            f"Risk        : {CURRENCY_SYMBOL}{trade.get('risk', 0):.2f} ({trade.get('risk_pct', 0):.2f}%)",
         ]
         if trade.get("risk_reward"):
             lines.append(f"Risk:Reward : {trade['risk_reward']}")
         if trade.get("cmp_at_entry"):
-            lines.append(f"CMP         : ₹{trade['cmp_at_entry']:.2f}")
+            lines.append(f"CMP         : {CURRENCY_SYMBOL}{trade['cmp_at_entry']:.2f}")
         if trade.get("trade_code"):
             lines.append(f"Code        : {trade['trade_code']}")
 

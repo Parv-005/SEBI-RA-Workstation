@@ -4,6 +4,7 @@ from database.db_helpers import (
     _get_cached_rows, invalidate_cache,
 )
 from utils.column_mapper import DEFAULT_HEADERS, map_row_to_trade, map_trade_to_columns
+from utils.constants import DATE_FMT_DB, DATE_FMT_COMPACT, MAX_TRADE_CODE_ATTEMPTS
 from utils.logger import setup_logger
 from openpyxl import load_workbook
 from datetime import datetime
@@ -55,7 +56,7 @@ def insert_trade(trade_data: dict) -> tuple[str, dict]:
         all_rows = _wb_to_dicts(ws, headers, is_trades=True)
         existing_codes = {r.get("trade_code") for r in all_rows}
         trade_code = _unique_trade_code(existing_codes)
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime(DATE_FMT_DB)
 
         enriched = {**trade_data, "trade_code": trade_code, "created_at": now, "updated_at": ""}
 
@@ -116,7 +117,7 @@ def update_trade(trade_code: str, fields: dict) -> bool:
             return False
 
         trade_data.update(fields)
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime(DATE_FMT_DB)
         trade_data["updated_at"] = now
 
         wb = load_workbook(TRADES_PATH)
@@ -148,14 +149,14 @@ def update_trade(trade_code: str, fields: dict) -> bool:
 
 
 def generate_trade_code() -> str:
-    date_str = datetime.now().strftime("%Y%m%d")
+    date_str = datetime.now().strftime(DATE_FMT_COMPACT)
     suffix = uuid.uuid4().hex[:6].upper()
     return f"TRD-{date_str}-{suffix}"
 
 
 def _unique_trade_code(existing_codes: set) -> str:
-    for _ in range(10):
+    for _ in range(MAX_TRADE_CODE_ATTEMPTS):
         code = generate_trade_code()
         if code not in existing_codes:
             return code
-    raise RuntimeError("Unable to generate a unique trade code after 10 attempts.")
+    raise RuntimeError(f"Unable to generate a unique trade code after {MAX_TRADE_CODE_ATTEMPTS} attempts.")

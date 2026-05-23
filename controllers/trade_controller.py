@@ -3,6 +3,7 @@ import json
 from services.results import BroadcastResult
 from services.google_sheets_service import GoogleSheetsService
 from utils.async_helper import run_async
+from utils.constants import BROADCAST_NOT_CONFIGURED, BROADCAST_NOT_AUTHORIZED
 from utils.logger import setup_logger
 
 logger = setup_logger("TradeController")
@@ -107,7 +108,7 @@ class TradeController:
                     result.sheets_success = False
                     result.errors.append(f"Google Sheets: {e}")
             else:
-                result.sheets_success = "not_configured"
+                result.sheets_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             logger.error(f"Sheets Error: {e}", exc_info=True)
             result.sheets_success = False
@@ -124,7 +125,7 @@ class TradeController:
                             authorized = await tg.connect()
                             if not authorized:
                                 logger.warning("Telegram: user not authorized (OTP required). Skipping send.")
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_new_trade(trade)
                             msg_ids, failures = await tg.send_to_groups(msg, selected_groups, img_path)
                             return ("multi", msg_ids, failures)
@@ -156,8 +157,8 @@ class TradeController:
                                 result.errors.append(f"Telegram ({name}): {err}")
                         if not msg_ids and failures:
                             result.telegram_success = False
-                    elif success == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif success == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(success)
                 else:
@@ -166,7 +167,7 @@ class TradeController:
                             authorized = await tg.connect()
                             if not authorized:
                                 logger.warning("Telegram: user not authorized (OTP required). Skipping send.")
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_new_trade(trade)
                             msg_id = await tg.send_trade_message(msg, img_path)
                             return msg_id
@@ -189,12 +190,12 @@ class TradeController:
                         except Exception as e:
                             logger.warning(f"Failed to persist telegram data: {e}")
                         _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
-                    elif success == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif success == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(success)
             else:
-                result.telegram_success = "not_configured"
+                result.telegram_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             logger.error(f"Telegram Error: {e}", exc_info=True)
             result.telegram_success = False
@@ -243,7 +244,7 @@ class TradeController:
                 except Exception as ue:
                     logger.warning(f"Failed to append update row to Updates sheet: {ue}")
             else:
-                result.sheets_success = "not_configured"
+                result.sheets_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             logger.error(f"Sheets Update Error: {e}", exc_info=True)
             result.sheets_success = False
@@ -263,7 +264,7 @@ class TradeController:
                             authorized = await tg.connect()
                             if not authorized:
                                 logger.warning("Telegram: user not authorized (OTP required). Skipping send.")
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_trade_update(trade, update_data)
                             msg_ids, failures = await tg.send_to_groups(msg, groups, img_path, reply_to_map)
                             return ("multi", msg_ids, failures)
@@ -295,8 +296,8 @@ class TradeController:
                                 result.errors.append(f"Telegram ({name}): {err}")
                         if not msg_ids and failures:
                             result.telegram_success = False
-                    elif success == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif success == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(success)
                 else:
@@ -314,7 +315,7 @@ class TradeController:
                             authorized = await tg.connect()
                             if not authorized:
                                 logger.warning("Telegram: user not authorized (OTP required). Skipping send.")
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_trade_update(trade, update_data)
                             msg_id = await tg.send_update_message(msg, img_path, reply_to=reply_to_id)
                             return msg_id
@@ -337,12 +338,12 @@ class TradeController:
                         except Exception as e:
                             logger.warning(f"Failed to persist telegram data: {e}")
                         _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
-                    elif success == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif success == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(success)
             else:
-                result.telegram_success = "not_configured"
+                result.telegram_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             logger.error(f"Telegram Update Error: {e}", exc_info=True)
             result.telegram_success = False

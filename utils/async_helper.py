@@ -1,10 +1,11 @@
 import asyncio
 import concurrent.futures
 
+from utils.constants import THREAD_POOL_SIZE
 from utils.logger import setup_logger
 
 logger = setup_logger("AsyncHelper")
-_thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+_thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE)
 
 
 def run_async(coro):

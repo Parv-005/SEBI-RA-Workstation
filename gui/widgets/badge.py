@@ -3,22 +3,34 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from gui.theme import get_color
+from utils.constants import STATUS_COLORS, UPDATE_TYPE_COLORS
 
 
-_BADGE_COLORS = {
-    "ACTIVE": ("badge_teal", "#ffffff"),
-    "CLOSED": ("badge_gray", "#ffffff"),
-    "LONG": ("badge_green", "#ffffff"),
-    "SHORT": ("badge_red", "#ffffff"),
-    "TARGET_HIT": ("badge_green", "#ffffff"),
-    "SL_HIT": ("badge_red", "#ffffff"),
-    "PARTIAL_PROFIT": ("badge_teal", "#ffffff"),
-    "TRAIL_SL": ("badge_blue", "#ffffff"),
-    "COST_TO_COST": ("badge_yellow", "#1a1a2e"),
-    "EXIT": ("badge_yellow", "#1a1a2e"),
-    "MODIFY_TARGET": ("badge_blue", "#ffffff"),
-    "MODIFY_SL": ("badge_blue", "#ffffff"),
+_BADGE_TYPE_TO_THEME = {
+    "ACTIVE": "badge_teal",
+    "CLOSED": "badge_gray",
+    "LONG": "badge_green",
+    "SHORT": "badge_red",
+    "TARGET_HIT": "badge_green",
+    "SL_HIT": "badge_red",
+    "PARTIAL_PROFIT": "badge_teal",
+    "TRAIL_SL": "badge_blue",
+    "COST_TO_COST": "badge_yellow",
+    "EXIT": "badge_yellow",
+    "MODIFY_TARGET": "badge_blue",
+    "MODIFY_SL": "badge_blue",
 }
+
+_BADGE_TEXT_DARK = "#1a1a2e"
+
+
+def _resolve_badge_style(badge_type: str) -> tuple[str, str]:
+    theme_key = _BADGE_TYPE_TO_THEME.get(badge_type, "badge_blue")
+    bg_color = get_color(theme_key)
+    text_color = "#ffffff"
+    if theme_key == "badge_yellow":
+        text_color = _BADGE_TEXT_DARK
+    return bg_color, text_color
 
 
 class Badge(QFrame):
@@ -29,10 +41,7 @@ class Badge(QFrame):
         if badge_type is None:
             badge_type = text.upper()
 
-        color_key, text_color = _BADGE_COLORS.get(
-            badge_type, ("badge_blue", "#ffffff")
-        )
-        bg = get_color(color_key)
+        bg, text_color = _resolve_badge_style(badge_type)
 
         self.setStyleSheet(f"""
         #badge {{
@@ -56,10 +65,7 @@ class Badge(QFrame):
         self._label.setText(text)
 
     def set_color(self, badge_type):
-        color_key, text_color = _BADGE_COLORS.get(
-            badge_type, ("badge_blue", "#ffffff")
-        )
-        bg = get_color(color_key)
+        bg, text_color = _resolve_badge_style(badge_type)
         self.setStyleSheet(f"""
         #badge {{
             background-color: {bg};

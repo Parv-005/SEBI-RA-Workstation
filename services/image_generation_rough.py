@@ -57,6 +57,8 @@ from psd_tools.psd.descriptor import String
 from PIL import Image, ImageDraw, ImageFont
 
 from core.paths import CONFIG_PATH, IMAGES_DIR, DATA_DIR
+from utils.constants import CURRENCY_SYMBOL, EMPTY_PLACEHOLDER
+from utils.formatters import format_currency
 from utils.logger import setup_logger
 
 logger = setup_logger("PSDImageGenerator")
@@ -182,7 +184,7 @@ class PSDImageGenerator:
 
         zone = ""
         if trade.get("zone_start") and trade.get("zone_end"):
-            zone = f"${trade['zone_start']:.2f} – ${trade['zone_end']:.2f}"
+            zone = f"{CURRENCY_SYMBOL}{trade['zone_start']:.2f} – {CURRENCY_SYMBOL}{trade['zone_end']:.2f}"
 
         return {
             # --- Core identity ---
@@ -191,19 +193,19 @@ class PSDImageGenerator:
             "long_short":   str(trade.get("action", "")),
             "trade_type":   str(trade.get("trade_type", "")),
             # --- Prices ---
-            "buy_price":    f"${float(entry):.2f}",
+            "buy_price":    f"{CURRENCY_SYMBOL}{float(entry):.2f}",
             "buy_zone":     zone,
-            "target":       f"${float(target):.2f}",
-            "stop_loss":    f"${float(sl):.2f}",
+            "target":       f"{CURRENCY_SYMBOL}{float(target):.2f}",
+            "stop_loss":    f"{CURRENCY_SYMBOL}{float(sl):.2f}",
             # --- Risk/Reward ---
-            "reward":       f"${float(reward):.2f}",
-            "risk":         f"${float(risk):.2f}",
+            "reward":       f"{CURRENCY_SYMBOL}{float(reward):.2f}",
+            "risk":         f"{CURRENCY_SYMBOL}{float(risk):.2f}",
             "risk_percentage":  f"{float(risk_pct):.2f}",
             "reward_percentage": f"{float(reward_pct):.2f}",
             "rrr":          str(trade.get("risk_reward", "")),
             # --- Misc ---
             "cmp_at_entry": (
-                f"${float(trade['cmp_at_entry']):.2f}"
+                f"{CURRENCY_SYMBOL}{float(trade['cmp_at_entry']):.2f}"
                 if trade.get("cmp_at_entry") else ""
             ),
             "date":         datetime.now().strftime("%d %b %Y"),
@@ -219,29 +221,29 @@ class PSDImageGenerator:
             "trade_code":   str(trade.get("trade_code", "")),
             "long_short":   str(trade.get("action", "")),
             "buy_price": (
-                f"${float(trade.get('entry_price', 0)):.2f}"
+                f"{CURRENCY_SYMBOL}{float(trade.get('entry_price', 0)):.2f}"
                 if trade.get("entry_price") else ""
             ),
             "target": (
-                f"${float(trade.get('target', 0)):.2f}"
+                f"{CURRENCY_SYMBOL}{float(trade.get('target', 0)):.2f}"
                 if trade.get("target") else ""
             ),
             "stop_loss": (
-                f"${float(trade.get('stop_loss', 0)):.2f}"
+                f"{CURRENCY_SYMBOL}{float(trade.get('stop_loss', 0)):.2f}"
                 if trade.get("stop_loss") else ""
             ),
             "update_type":  str(update.get("update_type", "")),
             "details":      str(update.get("details", "")),
             "exit_price": (
-                f"${float(update['exit_price']):.2f}"
+                f"{CURRENCY_SYMBOL}{float(update['exit_price']):.2f}"
                 if update.get("exit_price") else ""
             ),
             "new_sl": (
-                f"${float(update['latest_sl_price']):.2f}"
+                f"{CURRENCY_SYMBOL}{float(update['latest_sl_price']):.2f}"
                 if update.get("latest_sl_price") else ""
             ),
             "new_target": (
-                f"${float(update['latest_target']):.2f}"
+                f"{CURRENCY_SYMBOL}{float(update['latest_target']):.2f}"
                 if update.get("latest_target") else ""
             ),
             "date": datetime.now().strftime("%d %b %Y"),

@@ -9,7 +9,7 @@ from gui.models.trade_table_model import TradeTableModel, TradeFilterModel, COL_
 from gui.signals import get_signals
 from gui.theme import get_color
 from gui.widgets.toast import ToastWidget
-from utils.constants import STATUSES, STATUS_COLORS, ACTION_COLORS
+from utils.constants import STATUSES, STATUS_COLORS, ACTION_COLORS, FILTER_ALL
 from utils.logger import setup_logger
 
 logger = setup_logger("TradeList")
@@ -44,7 +44,7 @@ class TradeListView(QWidget):
         header.addWidget(title)
 
         self._filter_combo = QComboBox()
-        self._filter_combo.addItems(["ALL"] + list(STATUSES))
+        self._filter_combo.addItems([FILTER_ALL] + list(STATUSES))
         self._filter_combo.setMinimumWidth(120)
         self._filter_combo.currentTextChanged.connect(self._on_filter_change)
         header.addWidget(self._filter_combo)

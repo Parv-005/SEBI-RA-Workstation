@@ -10,7 +10,8 @@ from PySide6.QtGui import QFont
 from gui.signals import get_signals
 from gui.theme import get_color
 from gui.widgets.toast import ToastWidget
-from utils.constants import UPDATE_TYPES_DICT, UPDATE_TYPES, ACTION_COLORS, TRADE_TYPES
+from utils.constants import UPDATE_TYPES_DICT, UPDATE_TYPES, ACTION_COLORS, TRADE_TYPES, DEFAULT_ACTION, EMPTY_PLACEHOLDER
+from utils.formatters import format_currency
 from services.trade_service import (
     compute_update_fields, to_display_action,
     BLOCK_ON_MISSING_EXIT_PRICE
@@ -52,13 +53,13 @@ class UpdateDialog(QDialog):
         layout.setSpacing(12)
 
         trade = self.trade
-        action_display = to_display_action(trade.get("action") or "LONG")
+        action_display = to_display_action(trade.get("action") or DEFAULT_ACTION)
         entry = trade.get("entry_price")
         target = trade.get("target")
         sl = trade.get("stop_loss")
-        entry_str = f"\u20b9{entry:,.2f}" if isinstance(entry, (int, float)) else "\u2014"
-        target_str = f"\u20b9{target:,.2f}" if isinstance(target, (int, float)) else "\u2014"
-        sl_str = f"\u20b9{sl:,.2f}" if isinstance(sl, (int, float)) else "\u2014"
+        entry_str = format_currency(entry)
+        target_str = format_currency(target)
+        sl_str = format_currency(sl)
 
         info = QLabel(
             f"{trade.get('stock_name') or '?'} | {trade.get('segment') or '?'} | "

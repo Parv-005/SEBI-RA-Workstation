@@ -23,6 +23,7 @@ from utils.message_formatter import format_new_trade, format_trade_update
 from utils.async_helper import run_async, run_async_in_thread
 from core.config import Config
 from utils.config_manager import save_config
+from utils.constants import DATE_FMT_DB, THREAD_POOL_SIZE, AUTH_TIMEOUT_SEC, BROADCAST_NOT_CONFIGURED, BROADCAST_NOT_AUTHORIZED
 from utils.logger import setup_logger
 import threading
 import asyncio
@@ -101,7 +102,7 @@ class AppController(QObject):
         super().__init__(parent)
         self.signals = get_signals()
         self._pool = QThreadPool.globalInstance()
-        self._pool.setMaxThreadCount(4)
+        self._pool.setMaxThreadCount(THREAD_POOL_SIZE)
         self._auth_event = threading.Event()
         self._auth_input = None
         self._auth_input_lock = threading.Lock()
@@ -164,7 +165,7 @@ class AppController(QObject):
                 result.sheets_success = append_result.success
                 result.sheets_unmapped = append_result.unmapped_columns
             else:
-                result.sheets_success = "not_configured"
+                result.sheets_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             result.errors.append(f"Sheets: {e}")
             logger.error(f"Sheets broadcast failed in new_trade: {e}", exc_info=True)
@@ -177,7 +178,7 @@ class AppController(QObject):
                         try:
                             authed = await tg.connect()
                             if not authed:
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_new_trade(trade)
                             msg_ids, failures = await tg.send_to_groups(msg, selected_groups, result.image_path)
                             return ("multi", msg_ids, failures)
@@ -206,8 +207,8 @@ class AppController(QObject):
                                 result.errors.append(f"Telegram ({name}): {err}")
                         if not msg_ids and failures:
                             result.telegram_success = False
-                    elif tg_result == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif tg_result == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(tg_result)
                 else:
@@ -215,7 +216,7 @@ class AppController(QObject):
                         try:
                             authed = await tg.connect()
                             if not authed:
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_new_trade(trade)
                             msg_id = await tg.send_trade_message(msg, result.image_path)
                             return msg_id
@@ -235,12 +236,12 @@ class AppController(QObject):
                         except Exception as e:
                             logger.warning(f"Failed to persist telegram data: {e}")
                         _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
-                    elif tg_result == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif tg_result == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(tg_result)
             else:
-                result.telegram_success = "not_configured"
+                result.telegram_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             result.errors.append(f"Telegram: {e}")
             logger.error(f"Telegram broadcast failed in new_trade: {e}", exc_info=True)
@@ -324,7 +325,7 @@ class AppController(QObject):
                 except Exception as ue:
                     logger.warning(f"Failed to append update row to Updates sheet: {ue}")
             else:
-                result.sheets_success = "not_configured"
+                result.sheets_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             result.errors.append(f"Sheets: {e}")
             logger.error(f"Sheets broadcast failed in update: {e}", exc_info=True)
@@ -340,7 +341,7 @@ class AppController(QObject):
                         try:
                             authed = await tg.connect()
                             if not authed:
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_trade_update(trade, update_data_dict)
                             msg_ids, failures = await tg.send_to_groups(msg, groups, result.image_path, reply_to_map)
                             return ("multi", msg_ids, failures)
@@ -369,8 +370,8 @@ class AppController(QObject):
                                 result.errors.append(f"Telegram ({name}): {err}")
                         if not msg_ids and failures:
                             result.telegram_success = False
-                    elif tg_result == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif tg_result == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(tg_result)
                 else:
@@ -386,7 +387,7 @@ class AppController(QObject):
                         try:
                             authed = await tg.connect()
                             if not authed:
-                                return "not_authorized"
+                                return BROADCAST_NOT_AUTHORIZED
                             msg = format_trade_update(trade, update_data_dict)
                             msg_id = await tg.send_update_message(msg, result.image_path, reply_to=reply_to_id)
                             return msg_id
@@ -406,12 +407,12 @@ class AppController(QObject):
                         except Exception as e:
                             logger.warning(f"Failed to persist telegram data: {e}")
                         _sync_telegram_to_sheets(gs, trade["trade_code"], telegram_fields, result)
-                    elif tg_result == "not_authorized":
-                        result.telegram_success = "not_authorized"
+                    elif tg_result == BROADCAST_NOT_AUTHORIZED:
+                        result.telegram_success = BROADCAST_NOT_AUTHORIZED
                     else:
                         result.telegram_success = bool(tg_result)
             else:
-                result.telegram_success = "not_configured"
+                result.telegram_success = BROADCAST_NOT_CONFIGURED
         except Exception as e:
             result.errors.append(f"Telegram: {e}")
             logger.error(f"Telegram broadcast failed in update: {e}", exc_info=True)
@@ -504,7 +505,7 @@ class AppController(QObject):
     def _wait_for_auth_input(self):
         self._auth_event.clear()
         self._auth_input = None
-        self._auth_event.wait(timeout=120)
+        self._auth_event.wait(timeout=AUTH_TIMEOUT_SEC)
         with self._auth_input_lock:
             return self._auth_input
 
