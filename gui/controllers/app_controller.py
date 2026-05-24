@@ -442,12 +442,13 @@ class AppController(QObject):
         results = ao.search_symbol(stock_name, segment)
         if not results:
             raise ValueError(f"Symbol '{stock_name}' not found")
-        token = results[0].get("symbol")
+        tradingsymbol = results[0].get("tradingsymbol")
         exchange = results[0].get("exchange")
-        ltp = ao.get_ltp(token, exchange, token)
+        symboltoken = results[0].get("symboltoken")
+        ltp = ao.get_ltp(tradingsymbol, exchange, symboltoken)
         ao.disconnect()
         if ltp is None:
-            raise ValueError(f"Could not fetch LTP for {stock_name}")
+            raise ValueError(f"Could not fetch LTP for {tradingsymbol}")
         return ltp
 
     def _on_cmp_done(self, ltp):
