@@ -47,34 +47,6 @@ MAX_TRADE_CODE_ATTEMPTS: int = int(get_constant("max_trade_code_attempts", 10))
 AUTH_TIMEOUT_SEC: int = int(get_constant("auth_timeout_sec", 120))
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Emoji
-# ══════════════════════════════════════════════════════════════════════════════
-
-EMOJI = get_constant("emoji", {
-    "LONG": "\U0001f7e2",
-    "SHORT": "\U0001f534",
-    "SEGMENT": "\U0001f4ca",
-    "ENTRY_PRICE": "\U0001f4b0",
-    "ENTRY_ZONE": "\U0001f4cd",
-    "TARGET": "\U0001f3af",
-    "STOP_LOSS": "\U0001f6d1",
-    "TRADE_TYPE": "\U0001f3f7\ufe0f",
-    "APPROX_TIME": "\U0001f570\ufe0f",
-    "REWARD": "\U0001f7e2",
-    "RISK": "\U0001f534",
-    "RISK_REWARD": "\u2696\ufe0f",
-    "CMP": "\U0001f4c8",
-    "REMARKS": "\U0001f4dd",
-    "TIMESTAMP": "\U0001f550",
-    "TRADE_ID": "\U0001f194",
-    "TRADE_UPDATE": "\U0001f4e2",
-    "UPDATE": "\U0001f514",
-    "ACTION": "\U0001f4cc",
-    "FIELD_CHANGE": "\U0001f504",
-    "SEPARATOR": "\u2501" * 20,
-})
-
-# ══════════════════════════════════════════════════════════════════════════════
 #  Color Definitions (imported from theme or used standalone)
 # ══════════════════════════════════════════════════════════════════════════════
 
