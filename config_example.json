@@ -14,8 +14,8 @@
         "totp_secret": ""
     },
     "google_sheets": {
-        "service_account_json": "/home/pj/MyProjects/RandomStuff/SEBI_RA_Automation_Software/data/gen-lang-client-0475519263-e8683cc18813.json",
-        "spreadsheet_id": "1rneFTVmgArdki4McRXctZ1U8IwfliynyDHwkJByhtbw",
+        "service_account_json": "",
+        "spreadsheet_id": "",
         "sheet_name": "Trade_Test"
     },
     "image": {
