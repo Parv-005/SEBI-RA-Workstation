@@ -130,6 +130,67 @@ _DEFAULT_CONSTANTS = {
         "ACTIVE": "#17a2b8",
         "CLOSED": "#6c757d",
     },
+    "field_formats": {
+        "entry_price": "currency",
+        "target": "currency",
+        "stop_loss": "currency",
+        "latest_sl_price": "currency",
+        "latest_target": "currency",
+        "exit_price": "currency",
+        "cmp_at_entry": "currency",
+        "reward": "currency",
+        "risk": "currency",
+        "reward_pct": "percentage",
+        "risk_pct": "percentage",
+        "risk_reward": "risk_reward",
+        "created_at": "datetime",
+        "updated_at": "datetime",
+        "exit_datetime": "datetime",
+        "zone_start": "currency",
+        "zone_end": "currency",
+    },
+    "computed_vars": {
+        "trade": [
+            {
+                "key": "zone",
+                "label": "Entry Zone",
+                "description": "Formatted zone range from zone_start and zone_end",
+                "sample": "₹2,400.00 – ₹2,500.00",
+            },
+        ],
+        "update": [
+            {
+                "key": "update_type",
+                "label": "Update Type",
+                "description": "Configured update type name",
+                "sample": "TARGET_HIT",
+            },
+            {
+                "key": "details",
+                "label": "Update Details",
+                "description": "User-entered update message",
+                "sample": "Target Achieved! Book Profits.",
+            },
+            {
+                "key": "field_changes",
+                "label": "Field Changes",
+                "description": "Auto-generated old→new value lines",
+                "sample": "Entry Price: ₹2,450.00 → ₹2,600.00",
+            },
+            {
+                "key": "current_time",
+                "label": "Current Time",
+                "description": "Timestamp when update is sent",
+                "sample": "24-May-2026 02:30 PM",
+            },
+        ],
+    },
+    "default_templates": {
+        "new_trade": "**{action}** — {stock_name}\nSegment     : {segment}\nEntry Price : {entry_price}\nTarget      : {target}\nStop Loss   : {stop_loss}\nRisk:Reward : {risk_reward}\n{created_at} | {trade_code}",
+        "update": "**TRADE UPDATE** — {update_type}\n\n{stock_name} ({segment})\nAction      : {action}\nEntry Price : {entry_price}\n{field_changes}\n{details}\n\n{current_time} | {trade_code}",
+        "field_change_with_old": "{field_name}: {old_value} → {new_value}",
+        "field_change_new_only": "{field_name}: {new_value}",
+    },
 }
 
 

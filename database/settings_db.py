@@ -24,6 +24,29 @@ def set_setting(key: str, value: str):
         logger.error(f"Error setting {key} to {value}: {e}", exc_info=True)
 
 
+def get_template(key: str, default: str | None = None) -> str | None:
+    """Load a message template from settings."""
+    return get_setting(f"template_{key}") if get_setting(f"template_{key}") else default
+
+
+def set_template(key: str, value: str):
+    """Save a message template to settings."""
+    set_setting(f"template_{key}", value)
+
+
+def delete_template(key: str):
+    """Remove a message template from settings (reverts to defaults)."""
+    try:
+        data = _load_settings()
+        full_key = f"template_{key}"
+        if full_key in data:
+            del data[full_key]
+            _save_settings(data)
+            logger.info(f"Deleted template: {full_key}")
+    except Exception as e:
+        logger.error(f"Error deleting template {key}: {e}", exc_info=True)
+
+
 def _load_settings() -> dict:
     if SETTINGS_PATH.exists():
         try:

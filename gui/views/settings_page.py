@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QInputDialog, QMessageBox,
-    QFileDialog, QGridLayout
+    QFileDialog, QGridLayout, QTabWidget
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -10,11 +10,38 @@ from gui.signals import get_signals
 from gui.theme import get_color
 from gui.widgets.toast import ToastWidget
 from gui.widgets.section_card import SectionCard
+from gui.widgets.template_editor import TemplateEditorWidget
 from core.config import Config
 from utils.config_manager import save_config, load_config
 from utils.logger import setup_logger
 
 logger = setup_logger("SettingsView")
+
+_TAB_STYLE = f"""
+QTabWidget::pane {{
+    border: 1px solid {get_color('border')};
+    border-radius: 8px;
+    background-color: transparent;
+}}
+QTabBar::tab {{
+    color: {get_color('text_secondary')};
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    padding: 10px 24px;
+    font-family: "Segoe UI";
+    font-size: 13px;
+    font-weight: 600;
+    margin-right: 4px;
+}}
+QTabBar::tab:selected {{
+    color: {get_color('accent')};
+    border-bottom: 2px solid {get_color('accent')};
+}}
+QTabBar::tab:hover:!selected {{
+    color: {get_color('text_primary')};
+}}
+"""
 
 
 class SettingsView(QWidget):
@@ -29,10 +56,34 @@ class SettingsView(QWidget):
         self._setup_ui()
         self._connect_signals()
 
+    # ── Main UI ──────────────────────────────────────────────────────────
+
     def _setup_ui(self):
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.setSpacing(0)
+
+        title = QLabel("Settings")
+        title.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        title.setStyleSheet(f"color: {get_color('text_primary')}; background: transparent; padding: 24px 32px 0px 32px;")
+        outer_layout.addWidget(title)
+
+        self._tabs = QTabWidget()
+        self._tabs.setStyleSheet(_TAB_STYLE)
+        self._tabs.setDocumentMode(True)
+
+        self._build_credentials_tab()
+        self._build_formatting_tab()
+
+        outer_layout.addWidget(self._tabs, 1)
+
+    # ── Tab 1: Credentials ───────────────────────────────────────────────
+
+    def _build_credentials_tab(self):
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.setSpacing(0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -45,26 +96,25 @@ class SettingsView(QWidget):
         scroll_content.setObjectName("settings_content")
         scroll_content.setStyleSheet("#settings_content { background-color: transparent; }")
         form_layout = QVBoxLayout(scroll_content)
-        form_layout.setContentsMargins(32, 24, 32, 24)
+        form_layout.setContentsMargins(32, 16, 32, 24)
         form_layout.setSpacing(20)
 
-        title = QLabel("Settings")
-        title.setFont(QFont("Segoe UI", 24, QFont.Bold))
-        title.setStyleSheet(f"color: {get_color('text_primary')}; background: transparent;")
-        form_layout.addWidget(title)
-
+        # Telegram
         self._tg_card = SectionCard("Telegram API (Telethon)")
         self._build_tg_section()
         form_layout.addWidget(self._tg_card)
 
+        # Google Sheets
         self._gs_card = SectionCard("Google Sheets Integration")
         self._build_gs_section()
         form_layout.addWidget(self._gs_card)
 
+        # AngelOne
         self._ao_card = SectionCard("AngelOne SmartAPI")
         self._build_ao_section()
         form_layout.addWidget(self._ao_card)
 
+        # Save button
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
         btn_row.addStretch()
@@ -82,7 +132,94 @@ class SettingsView(QWidget):
         form_layout.addStretch()
 
         scroll.setWidget(scroll_content)
-        outer_layout.addWidget(scroll, 1)
+        tab_layout.addWidget(scroll, 1)
+        self._tabs.addTab(tab, "Credentials")
+
+    # ── Tab 2: Message Formatting ────────────────────────────────────────
+
+    def _build_formatting_tab(self):
+        tab = QWidget()
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setObjectName("fmt_scroll")
+        scroll.setStyleSheet("#fmt_scroll { background-color: transparent; border: none; }")
+
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        content_layout = QVBoxLayout(scroll_content)
+        content_layout.setContentsMargins(32, 16, 32, 24)
+        content_layout.setSpacing(16)
+
+        # ── New Trade template ───────────────────────────────────────
+        trade_label = QLabel("New Trade Message")
+        trade_label.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        trade_label.setStyleSheet(f"color: {get_color('text_primary')}; background: transparent;")
+        content_layout.addWidget(trade_label)
+
+        trade_desc = QLabel(
+            "Template for messages sent when a new trade is created and broadcast to Telegram."
+        )
+        trade_desc.setWordWrap(True)
+        trade_desc.setStyleSheet(f"color: {get_color('text_secondary')}; background: transparent; font-size: 12px;")
+        content_layout.addWidget(trade_desc)
+
+        self._trade_editor = TemplateEditorWidget(template_type="trade")
+        self._trade_editor.setMinimumHeight(340)
+        content_layout.addWidget(self._trade_editor)
+
+        # ── Update template ──────────────────────────────────────────
+        update_label = QLabel("Trade Update Message")
+        update_label.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        update_label.setStyleSheet(f"color: {get_color('text_primary')}; background: transparent;")
+        content_layout.addWidget(update_label)
+
+        update_desc = QLabel(
+            "Template for messages sent when a trade update is broadcast to Telegram."
+        )
+        update_desc.setWordWrap(True)
+        update_desc.setStyleSheet(f"color: {get_color('text_secondary')}; background: transparent; font-size: 12px;")
+        content_layout.addWidget(update_desc)
+
+        self._update_editor = TemplateEditorWidget(template_type="update")
+        self._update_editor.setMinimumHeight(340)
+        content_layout.addWidget(self._update_editor)
+
+        # ── Action buttons ───────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+
+        reset_btn = QPushButton("Reset to Default")
+        reset_btn.setObjectName("ghost")
+        reset_btn.setCursor(Qt.PointingHandCursor)
+        reset_btn.setMinimumHeight(40)
+        reset_btn.clicked.connect(self._on_reset_templates)
+        btn_row.addWidget(reset_btn)
+
+        btn_row.addStretch()
+
+        self._save_tpl_btn = QPushButton("Save Templates")
+        self._save_tpl_btn.setObjectName("success")
+        self._save_tpl_btn.setMinimumWidth(180)
+        self._save_tpl_btn.setMinimumHeight(40)
+        self._save_tpl_btn.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        self._save_tpl_btn.setCursor(Qt.PointingHandCursor)
+        self._save_tpl_btn.clicked.connect(self._on_save_templates)
+        btn_row.addWidget(self._save_tpl_btn)
+
+        content_layout.addLayout(btn_row)
+        content_layout.addStretch()
+
+        scroll.setWidget(scroll_content)
+        tab_layout.addWidget(scroll, 1)
+        self._tabs.addTab(tab, "Message Formatting")
+
+    # ── Entry helper ─────────────────────────────────────────────────────
 
     def _add_entry(self, card, label_text, key, default="", placeholder="", browse=False):
         row = QHBoxLayout()
@@ -105,7 +242,7 @@ class SettingsView(QWidget):
             browse_btn.setObjectName("ghost")
             browse_btn.setCursor(Qt.PointingHandCursor)
 
-            def on_browse():
+            def on_browse(entry=entry):
                 path, _ = QFileDialog.getOpenFileName(
                     self, "Select Service Account JSON",
                     "", "JSON Files (*.json);;All Files (*)"
@@ -118,6 +255,8 @@ class SettingsView(QWidget):
 
         card.add_layout(row)
         self._entries[key] = entry
+
+    # ── Credentials sections ─────────────────────────────────────────────
 
     def _build_tg_section(self):
         c = self._config.get("telegram", {})
@@ -226,14 +365,19 @@ class SettingsView(QWidget):
         self._add_entry(self._ao_card, "Password (PIN)", "ao_password", c.get("password", ""))
         self._add_entry(self._ao_card, "TOTP Secret", "ao_totp", c.get("totp_secret", ""))
 
+    # ── Auth signals ─────────────────────────────────────────────────────
+
     def _connect_signals(self):
         self._signals.telegram_auth_needs_otp.connect(self._on_needs_otp)
         self._signals.telegram_auth_needs_2fa.connect(self._on_needs_2fa)
         self._signals.telegram_auth_success.connect(self._on_auth_success)
         self._signals.telegram_auth_error.connect(self._on_auth_error)
 
+    # ── Show / load ──────────────────────────────────────────────────────
+
     def on_show(self):
         self._load_config_data()
+        self._load_template_data()
 
     def _load_config_data(self):
         try:
@@ -241,7 +385,6 @@ class SettingsView(QWidget):
         except Exception as e:
             logger.error(f"Config.get() failed: {e}", exc_info=True)
             self._config = {}
-            from utils.config_manager import load_config
             try:
                 self._config = load_config()
             except Exception as e2:
@@ -249,7 +392,6 @@ class SettingsView(QWidget):
                 self._config = {}
 
         self._group_rows.clear()
-
         self._clear_layout(self._groups_layout)
 
         c = self._config.get("telegram", {})
@@ -300,6 +442,12 @@ class SettingsView(QWidget):
                     self._config.get("angelone", {}).get(field_map[key], "")
                 )
 
+    def _load_template_data(self):
+        self._trade_editor._reload_template()
+        self._update_editor._reload_template()
+
+    # ── Credentials save ─────────────────────────────────────────────────
+
     def _on_save(self):
         logger.info("Saving settings")
         config = self._assemble_config()
@@ -342,6 +490,48 @@ class SettingsView(QWidget):
         current["angelone"] = angelone
 
         return current
+
+    # ── Template save / reset ────────────────────────────────────────────
+
+    def _on_save_templates(self):
+        self._trade_editor.save()
+        self._update_editor.save()
+
+        from utils.constants_loader import clear_cache
+        clear_cache()
+
+        self._signals.notification.emit(
+            "Message templates saved successfully!",
+            ToastWidget.SUCCESS,
+            3000,
+        )
+
+    def _on_reset_templates(self):
+        reply = QMessageBox.question(
+            self, "Reset Templates",
+            "Reset all message templates to their default values?\n\n"
+            "Your custom templates will be lost.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        self._trade_editor.reset()
+        self._update_editor.reset()
+
+        from utils.constants_loader import clear_cache
+        clear_cache()
+
+        self._load_template_data()
+
+        self._signals.notification.emit(
+            "Templates reset to defaults.",
+            ToastWidget.SUCCESS,
+            3000,
+        )
+
+    # ── Telegram auth ────────────────────────────────────────────────────
 
     def _on_auth_telegram(self):
         self._on_save()
