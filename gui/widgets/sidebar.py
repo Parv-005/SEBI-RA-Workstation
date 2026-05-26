@@ -92,13 +92,13 @@ class Sidebar(QFrame):
         self._theme_combo.currentTextChanged.connect(self._on_theme_change)
         theme_layout.addWidget(self._theme_combo)
 
-        compliance = QLabel("SEBI Reg: INH000021386")
-        compliance.setStyleSheet(
-            f"color: {get_color('text_muted')}; font-size: 9px; "
-            f"padding: 8 0 0 0; background: transparent; border: none;"
-        )
-        compliance.setAlignment(Qt.AlignLeft)
-        theme_layout.addWidget(compliance)
+        # compliance = QLabel("SEBI Reg: INH000021386")
+        # compliance.setStyleSheet(
+        #     f"color: {get_color('text_muted')}; font-size: 9px; "
+        #     f"padding: 8 0 0 0; background: transparent; border: none;"
+        # )
+        # compliance.setAlignment(Qt.AlignLeft)
+        # theme_layout.addWidget(compliance)
 
         layout.addWidget(theme_container)
 

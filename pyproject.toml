@@ -26,5 +26,8 @@ dependencies = [
 [project.scripts]
 sebi-ra = "main:main"
 
+[tool.setuptools]
+py-modules = ["main"]
+
 [tool.setuptools.packages.find]
 include = ["gui*", "services*", "utils*", "core*", "database*", "controllers*"]
