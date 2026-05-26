@@ -18,6 +18,9 @@
         "spreadsheet_id": "",
         "sheet_name": "Trade_Test"
     },
+    "broadcast": {
+        "image_generation_enabled": true
+    },
     "image": {
         "trade_template": "templates/trade_template.png",
         "update_template": "templates/update_template.png",

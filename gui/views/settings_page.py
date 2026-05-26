@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QInputDialog, QMessageBox,
-    QFileDialog, QGridLayout, QTabWidget
+    QFileDialog, QGridLayout, QTabWidget, QCheckBox
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
@@ -113,6 +113,11 @@ class SettingsView(QWidget):
         self._ao_card = SectionCard("AngelOne SmartAPI")
         self._build_ao_section()
         form_layout.addWidget(self._ao_card)
+
+        # Broadcast options
+        self._broadcast_card = SectionCard("Broadcast Options")
+        self._build_broadcast_section()
+        form_layout.addWidget(self._broadcast_card)
 
         # Save button
         btn_row = QHBoxLayout()
@@ -385,6 +390,33 @@ class SettingsView(QWidget):
         self._add_entry(self._ao_card, "Password (PIN)", "ao_password", c.get("password", ""), secret=True)
         self._add_entry(self._ao_card, "TOTP Secret", "ao_totp", c.get("totp_secret", ""), secret=True)
 
+    def _build_broadcast_section(self):
+        c = self._config.get("broadcast", {})
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        label = QLabel("Generate Trade Images")
+        label.setFixedWidth(160)
+        label.setStyleSheet(
+            f"color: {get_color('text_secondary')}; font-size: 13px; "
+            f"font-weight: 500; background: transparent;"
+        )
+        row.addWidget(label)
+        self._image_gen_toggle = QCheckBox()
+        self._image_gen_toggle.setChecked(c.get("image_generation_enabled", True))
+        self._image_gen_toggle.setStyleSheet(
+            f"QCheckBox {{ spacing: 8px; background: transparent; }}"
+            f"QCheckBox::indicator {{ width: 18px; height: 18px; }}"
+        )
+        row.addWidget(self._image_gen_toggle)
+        hint = QLabel("When off, messages are sent without images")
+        hint.setStyleSheet(
+            f"color: {get_color('text_muted')}; font-size: 11px; "
+            f"background: transparent; border: none;"
+        )
+        row.addWidget(hint)
+        row.addStretch()
+        self._broadcast_card.add_layout(row)
+
     # ── Auth signals ─────────────────────────────────────────────────────
 
     def _connect_signals(self):
@@ -464,6 +496,9 @@ class SettingsView(QWidget):
                     self._config.get("angelone", {}).get(field_map[key], "")
                 )
 
+        bc = self._config.get("broadcast", {})
+        self._image_gen_toggle.setChecked(bc.get("image_generation_enabled", True))
+
     def _load_template_data(self):
         self._trade_editor._reload_template()
         self._update_editor._reload_template()
@@ -527,6 +562,10 @@ class SettingsView(QWidget):
         angelone["password"] = self._entry_val("ao_password", "angelone", "password")
         angelone["totp_secret"] = self._entry_val("ao_totp", "angelone", "totp_secret")
         current["angelone"] = angelone
+
+        broadcast = current.get("broadcast", {})
+        broadcast["image_generation_enabled"] = self._image_gen_toggle.isChecked()
+        current["broadcast"] = broadcast
 
         return current
 
