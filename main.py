@@ -7,7 +7,12 @@ from utils.startup_checks import check_constants_file
 from database.db_manager import init_db
 from gui.main import run_app
 
-if __name__ == "__main__":
+
+def main():
     check_constants_file()
     init_db()
     run_app()
+
+
+if __name__ == "__main__":
+    main()
