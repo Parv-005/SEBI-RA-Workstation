@@ -223,33 +223,37 @@ class NewTradeView(QWidget):
         self._entry_price.textChanged.connect(self._on_rr_input_change)
         grid.addWidget(self._entry_price, row, 1)
 
+        zone_label = self._make_label("Zone")
+        grid.addWidget(zone_label, row, 2)
+
+        zone_container = QWidget()
+        zone_layout = QHBoxLayout(zone_container)
+        zone_layout.setContentsMargins(0, 0, 0, 0)
+        zone_layout.setSpacing(6)
+        self._zone_start = self._make_input("Start / +50/-5%")
+        self._zone_start.editingFinished.connect(self._apply_zone_offsets)
+        zone_layout.addWidget(self._zone_start, 1)
+        zone_sep = QLabel("–")
+        zone_sep.setStyleSheet("color: #888; background: transparent; border: none;")
+        zone_layout.addWidget(zone_sep)
+        self._zone_end = self._make_input("End / +100")
+        self._zone_end.editingFinished.connect(self._apply_zone_offsets)
+        zone_layout.addWidget(self._zone_end, 1)
+        grid.addWidget(zone_container, row, 3)
+
+        row += 1
+
         target_label = self._make_label("Target Price")
-        grid.addWidget(target_label, row, 2)
+        grid.addWidget(target_label, row, 0)
         self._target_price = self._make_input("0.00")
         self._target_price.textChanged.connect(self._on_rr_input_change)
-        grid.addWidget(self._target_price, row, 3)
-
-        row += 1
-
-        zone_start_label = self._make_label("Zone Start")
-        grid.addWidget(zone_start_label, row, 0)
-        self._zone_start = self._make_input("Lower bound or +50/-5%")
-        self._zone_start.editingFinished.connect(self._apply_zone_offsets)
-        grid.addWidget(self._zone_start, row, 1)
-
-        zone_end_label = self._make_label("Zone End")
-        grid.addWidget(zone_end_label, row, 2)
-        self._zone_end = self._make_input("Upper bound or +100")
-        self._zone_end.editingFinished.connect(self._apply_zone_offsets)
-        grid.addWidget(self._zone_end, row, 3)
-
-        row += 1
+        grid.addWidget(self._target_price, row, 1)
 
         sl_label = self._make_label("Stop Loss")
-        grid.addWidget(sl_label, row, 0)
+        grid.addWidget(sl_label, row, 2)
         self._stop_loss = self._make_input("0.00")
         self._stop_loss.textChanged.connect(self._on_rr_input_change)
-        grid.addWidget(self._stop_loss, row, 1)
+        grid.addWidget(self._stop_loss, row, 3)
 
         self._prices_card.add_layout(grid)
 
