@@ -5,6 +5,7 @@ from services.google_sheets_service import GoogleSheetsService
 from utils.async_helper import run_async
 from utils.constants import BROADCAST_NOT_CONFIGURED, BROADCAST_NOT_AUTHORIZED
 from utils.logger import setup_logger
+from core.config import Config
 
 logger = setup_logger("TradeController")
 
@@ -87,14 +88,18 @@ class TradeController:
         img_path = None
         gs = None
 
-        try:
-            img_gen = ImageGenerator()
-            img_path = img_gen.generate_trade_image(trade)
-            result.image_success = img_path is not None
-            result.image_path = img_path
-        except Exception as e:
-            logger.error(f"Image generation error: {e}", exc_info=True)
-            result.image_success = False
+        image_enabled = Config.get().get("broadcast", {}).get("image_generation_enabled", True)
+        if image_enabled:
+            try:
+                img_gen = ImageGenerator()
+                img_path = img_gen.generate_trade_image(trade)
+                result.image_success = img_path is not None
+                result.image_path = img_path
+            except Exception as e:
+                logger.error(f"Image generation error: {e}", exc_info=True)
+                result.image_success = False
+        else:
+            result.image_success = True
 
         try:
             gs = GoogleSheetsService()
@@ -216,14 +221,18 @@ class TradeController:
         img_path = None
         gs = None
 
-        try:
-            img_gen = ImageGenerator()
-            img_path = img_gen.generate_update_image(trade, update_data)
-            result.image_success = img_path is not None
-            result.image_path = img_path
-        except Exception as e:
-            logger.error(f"Image generation error: {e}", exc_info=True)
-            result.image_success = False
+        image_enabled = Config.get().get("broadcast", {}).get("image_generation_enabled", True)
+        if image_enabled:
+            try:
+                img_gen = ImageGenerator()
+                img_path = img_gen.generate_update_image(trade, update_data)
+                result.image_success = img_path is not None
+                result.image_path = img_path
+            except Exception as e:
+                logger.error(f"Image generation error: {e}", exc_info=True)
+                result.image_success = False
+        else:
+            result.image_success = True
 
         try:
             gs = GoogleSheetsService()

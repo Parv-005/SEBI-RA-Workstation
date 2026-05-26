@@ -39,8 +39,12 @@ class BroadcastResult:
 
 def build_broadcast_summary(result: BroadcastResult) -> str:
     parts = []
-    if result.image_success:
+    if result.image_path:
         parts.append("Image generated")
+    elif result.image_success and result.image_path is None:
+        parts.append("Image skipped")
+    elif not result.image_success:
+        parts.append("Image failed")
     if result.sheets_success is True:
         parts.append("Google Sheets updated")
     elif result.sheets_success == BROADCAST_NOT_CONFIGURED:

@@ -161,6 +161,7 @@ class AppController(QObject):
                 result.errors.append(f"Image: {e}")
         else:
             result.image_success = True
+            result.image_path = None
 
         try:
             gs = GoogleSheetsService()
@@ -315,6 +316,7 @@ class AppController(QObject):
                 result.errors.append(f"Image: {e}")
         else:
             result.image_success = True
+            result.image_path = None
 
         try:
             gs = GoogleSheetsService()
