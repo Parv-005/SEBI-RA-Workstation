@@ -147,15 +147,31 @@ class NewTradeView(QWidget):
 
         stock_label = self._make_label("Stock / Symbol")
         grid.addWidget(stock_label, row, 0)
-        self._stock_entry = self._make_input("e.g. RELIANCE, BANKNIFTY")
-        grid.addWidget(self._stock_entry, row, 1, 1, 2)
 
+        stock_container = QWidget()
+        stock_layout = QHBoxLayout(stock_container)
+        stock_layout.setContentsMargins(0, 0, 0, 0)
+        stock_layout.setSpacing(4)
+        self._stock_entry = self._make_input("e.g. RELIANCE, BANKNIFTY")
+        stock_layout.addWidget(self._stock_entry, 9)
         self._fetch_cmp_btn = QPushButton("Fetch CMP")
         self._fetch_cmp_btn.setObjectName("gold")
-        self._fetch_cmp_btn.setMinimumWidth(110)
+        self._fetch_cmp_btn.setMinimumWidth(90)
+        self._fetch_cmp_btn.setMaximumWidth(120)
+        self._fetch_cmp_btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self._fetch_cmp_btn.setCursor(Qt.PointingHandCursor)
+        self._fetch_cmp_btn.setStyleSheet(
+            "QPushButton { padding: 0px 4px; margin: 0px; font-size: 11px; }"
+        )
+        self._fetch_cmp_btn.setToolTip("Fetch CMP")
         self._fetch_cmp_btn.clicked.connect(self._on_fetch_cmp)
-        grid.addWidget(self._fetch_cmp_btn, row, 3)
+        stock_layout.addWidget(self._fetch_cmp_btn)
+        grid.addWidget(stock_container, row, 1)
+
+        cmp_label = self._make_label("CMP")
+        grid.addWidget(cmp_label, row, 2)
+        self._cmp_entry = self._make_input("0.00")
+        grid.addWidget(self._cmp_entry, row, 3)
 
         row += 1
 
@@ -408,7 +424,7 @@ class NewTradeView(QWidget):
         self._controller.fetch_cmp(stock, segment)
 
     def _on_cmp_fetched(self, ltp):
-        self._entry_price.setText(f"{ltp:.2f}")
+        self._cmp_entry.setText(f"{ltp:.2f}")
         self._fetch_cmp_btn.setEnabled(True)
         self._fetch_cmp_btn.setText("Fetch CMP")
         self._signals.notification.emit(
@@ -499,6 +515,7 @@ class NewTradeView(QWidget):
             "action": action_db,
             "trade_type": self._trade_type_combo.currentText(),
             "approx_time": self._approx_time_entry.text().strip(),
+            "cmp_at_entry": float(self._cmp_entry.text()) if self._cmp_entry.text().strip() else None,
             "entry_price": entry,
             "target": target,
             "stop_loss": sl,
@@ -560,6 +577,7 @@ class NewTradeView(QWidget):
 
     def _clear_form(self):
         self._stock_entry.clear()
+        self._cmp_entry.clear()
         self._entry_price.clear()
         self._target_price.clear()
         self._stop_loss.clear()
