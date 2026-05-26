@@ -121,6 +121,41 @@ SEBI_RA_Automation_Software/
 | `Ctrl+S` | Settings |
 | `Escape` | Back to Active Trades |
 
+## Building for Windows
+
+To create a standalone Windows executable (no Python needed on the target machine):
+
+### Prerequisites
+
+- Python 3.10+ on the build machine
+- All project dependencies installed (`pip install -e ".[dev]"`)
+
+### Build
+
+```bat
+build.bat
+```
+
+Or manually:
+
+```bat
+pip install pyinstaller>=6.0
+pyinstaller sebi_ra.spec --clean --noconfirm
+```
+
+### Output
+
+The built application is in `dist\SEBI_RA_Automation\`.
+
+### Distribution
+
+1. Copy the entire `dist\SEBI_RA_Automation\` folder to the target Windows machine
+2. Copy `config_example.json` to `config.json` and fill in credentials
+3. Place `config.json` next to `SEBI_RA_Automation.exe`
+4. Double-click `SEBI_RA_Automation.exe` to run
+
+The app auto-creates the `data\` directory (trades, logs, images) next to the `.exe` on first run.
+
 ## License
 
 Private — All rights reserved.

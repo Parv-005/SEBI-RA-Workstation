@@ -23,6 +23,9 @@ dependencies = [
     "icecream>=2.2.0",
 ]
 
+[project.optional-dependencies]
+dev = ["pyinstaller>=6.0"]
+
 [project.scripts]
 sebi-ra = "main:main"
 

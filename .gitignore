@@ -16,6 +16,9 @@ dist/
 build/
 .eggs/
 
+# PyInstaller
+*.spec.bak
+
 # IDE
 .vscode/
 .idea/
