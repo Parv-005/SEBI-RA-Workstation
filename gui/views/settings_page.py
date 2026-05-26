@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QScrollArea, QFrame, QInputDialog, QMessageBox,
     QFileDialog, QGridLayout, QTabWidget
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 
 from gui.signals import get_signals
@@ -221,7 +221,7 @@ class SettingsView(QWidget):
 
     # ── Entry helper ─────────────────────────────────────────────────────
 
-    def _add_entry(self, card, label_text, key, default="", placeholder="", browse=False):
+    def _add_entry(self, card, label_text, key, default="", placeholder="", browse=False, secret=False):
         row = QHBoxLayout()
         row.setSpacing(12)
 
@@ -235,7 +235,23 @@ class SettingsView(QWidget):
         entry.setText(str(default))
         if placeholder:
             entry.setPlaceholderText(placeholder)
+        if secret:
+            entry.setEchoMode(QLineEdit.Password)
         row.addWidget(entry, 1)
+
+        if secret:
+            toggle_btn = QPushButton("Show")
+            toggle_btn.setFixedWidth(56)
+            toggle_btn.setCursor(Qt.PointingHandCursor)
+            toggle_btn.setStyleSheet(
+                f"QPushButton {{ background: transparent; border: 1px solid {get_color('border')}; border-radius: 4px; "
+                f"color: {get_color('text_muted')}; font-size: 12px; font-weight: 600; padding: 2px 4px; }}"
+                f"QPushButton:hover {{ color: {get_color('text_primary')}; border-color: {get_color('text_muted')}; }}"
+                f"QPushButton:pressed {{ background-color: {get_color('surface_hover')}; }}"
+            )
+            toggle_btn.pressed.connect(lambda e=entry, b=toggle_btn: (e.setEchoMode(QLineEdit.Normal), b.setText("Hide")))
+            toggle_btn.released.connect(lambda e=entry, b=toggle_btn: (e.setEchoMode(QLineEdit.Password), b.setText("Show")))
+            row.addWidget(toggle_btn)
 
         if browse:
             browse_btn = QPushButton("Browse")
@@ -263,7 +279,7 @@ class SettingsView(QWidget):
         self._add_entry(self._tg_card, "API ID", "tg_api_id", c.get("api_id", ""),
                        "Your Telegram API ID")
         self._add_entry(self._tg_card, "API Hash", "tg_api_hash", c.get("api_hash", ""),
-                       "Your Telegram API Hash")
+                       "Your Telegram API Hash", secret=True)
         self._add_entry(self._tg_card, "Phone Number", "tg_phone", c.get("phone", ""),
                        "e.g. +919XXXXXXXXX")
 
@@ -328,10 +344,14 @@ class SettingsView(QWidget):
         id_entry.setPlaceholderText("Group ID (e.g. -100...)")
         row_layout.addWidget(id_entry, 2)
 
-        remove_btn = QPushButton("X")
-        remove_btn.setFixedWidth(32)
-        remove_btn.setObjectName("ghost")
+        remove_btn = QPushButton("Remove")
+        remove_btn.setFixedWidth(70)
         remove_btn.setCursor(Qt.PointingHandCursor)
+        remove_btn.setStyleSheet(
+            f"QPushButton {{ background-color: transparent; border: 1px solid {get_color('border')}; border-radius: 4px; "
+            f"color: {get_color('text_muted')}; font-size: 12px; font-weight: 600; padding: 4px 8px; }}"
+            f"QPushButton:hover {{ color: #ff4444; border-color: #ff4444; }}"
+        )
         remove_btn.clicked.connect(lambda: self._remove_group_row(row_widget))
         row_layout.addWidget(remove_btn)
 
@@ -360,10 +380,10 @@ class SettingsView(QWidget):
 
     def _build_ao_section(self):
         c = self._config.get("angelone", {})
-        self._add_entry(self._ao_card, "API Key", "ao_api_key", c.get("api_key", ""))
+        self._add_entry(self._ao_card, "API Key", "ao_api_key", c.get("api_key", ""), secret=True)
         self._add_entry(self._ao_card, "Client ID", "ao_client_id", c.get("client_id", ""))
-        self._add_entry(self._ao_card, "Password (PIN)", "ao_password", c.get("password", ""))
-        self._add_entry(self._ao_card, "TOTP Secret", "ao_totp", c.get("totp_secret", ""))
+        self._add_entry(self._ao_card, "Password (PIN)", "ao_password", c.get("password", ""), secret=True)
+        self._add_entry(self._ao_card, "TOTP Secret", "ao_totp", c.get("totp_secret", ""), secret=True)
 
     # ── Auth signals ─────────────────────────────────────────────────────
 
@@ -372,6 +392,8 @@ class SettingsView(QWidget):
         self._signals.telegram_auth_needs_2fa.connect(self._on_needs_2fa)
         self._signals.telegram_auth_success.connect(self._on_auth_success)
         self._signals.telegram_auth_error.connect(self._on_auth_error)
+        self._signals.settings_saved.connect(self._on_save_success)
+        self._signals.settings_error.connect(self._on_save_error)
 
     # ── Show / load ──────────────────────────────────────────────────────
 
@@ -450,8 +472,25 @@ class SettingsView(QWidget):
 
     def _on_save(self):
         logger.info("Saving settings")
+        self._save_btn.setEnabled(False)
+        self._save_btn.setText("Saving...")
         config = self._assemble_config()
         self._controller.save_settings(config)
+
+    def _on_save_success(self):
+        self._save_btn.setEnabled(True)
+        self._save_btn.setText("Saved!")
+        self._signals.notification.emit(
+            "Settings saved successfully!", ToastWidget.SUCCESS, 3000
+        )
+        QTimer.singleShot(2000, lambda: self._save_btn.setText("Save Settings"))
+
+    def _on_save_error(self, err):
+        self._save_btn.setEnabled(True)
+        self._save_btn.setText("Save Settings")
+        self._signals.notification.emit(
+            f"Failed to save settings: {err}", ToastWidget.ERROR, 4000
+        )
 
     def _entry_val(self, key, section, config_key):
         if key in self._entries:
