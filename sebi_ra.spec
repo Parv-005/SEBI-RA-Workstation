@@ -33,6 +33,8 @@ a = Analysis(
         'PIL.ImageFont',
         'google.oauth2.service_account',
         'google.auth',
+        'websocket',
+        'websocket._core',
     ],
     hookspath=[],
     hooksconfig={},
