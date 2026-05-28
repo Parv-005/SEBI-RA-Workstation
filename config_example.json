@@ -21,6 +21,9 @@
     "broadcast": {
         "image_generation_enabled": true
     },
+    "updates": {
+        "check_on_startup": true
+    },
     "image": {
         "trade_template": "templates/trade_template.png",
         "update_template": "templates/update_template.png",

@@ -1,9 +1,9 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QInputDialog, QMessageBox,
     QFileDialog, QGridLayout, QTabWidget, QCheckBox
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtGui import QFont
 
 from gui.signals import get_signals
@@ -11,7 +11,9 @@ from gui.theme import get_color
 from gui.widgets.toast import ToastWidget
 from gui.widgets.section_card import SectionCard
 from gui.widgets.template_editor import TemplateEditorWidget
+from gui.workers import Worker
 from core.config import Config
+from services.update_service import check_for_update
 from utils.config_manager import save_config, load_config
 from utils.logger import setup_logger
 
@@ -118,6 +120,11 @@ class SettingsView(QWidget):
         self._broadcast_card = SectionCard("Broadcast Options")
         self._build_broadcast_section()
         form_layout.addWidget(self._broadcast_card)
+
+        # Updates
+        self._updates_card = SectionCard("Updates")
+        self._build_updates_section()
+        form_layout.addWidget(self._updates_card)
 
         # Save button
         btn_row = QHBoxLayout()
@@ -417,6 +424,107 @@ class SettingsView(QWidget):
         row.addStretch()
         self._broadcast_card.add_layout(row)
 
+    def _build_updates_section(self):
+        c = self._config.get("updates", {})
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        label = QLabel("Check on Startup")
+        label.setFixedWidth(160)
+        label.setStyleSheet(
+            f"color: {get_color('text_secondary')}; font-size: 13px; "
+            f"font-weight: 500; background: transparent;"
+        )
+        row.addWidget(label)
+        self._updates_startup_toggle = QCheckBox()
+        self._updates_startup_toggle.setChecked(c.get("check_on_startup", True))
+        self._updates_startup_toggle.setStyleSheet(
+            f"QCheckBox {{ spacing: 8px; background: transparent; }}"
+            f"QCheckBox::indicator {{ width: 18px; height: 18px; }}"
+        )
+        row.addWidget(self._updates_startup_toggle)
+        hint = QLabel("Automatically checks for updates when the app starts")
+        hint.setStyleSheet(
+            f"color: {get_color('text_muted')}; font-size: 11px; "
+            f"background: transparent; border: none;"
+        )
+        row.addWidget(hint)
+        row.addStretch()
+        self._updates_card.add_layout(row)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+
+        self._updates_status = QLabel("")
+        self._updates_status.setStyleSheet(
+            f"color: {get_color('text_muted')}; font-size: 12px; "
+            f"background: transparent; border: none;"
+        )
+        btn_row.addWidget(self._updates_status, 1)
+
+        self._check_now_btn = QPushButton("Check Now")
+        self._check_now_btn.setObjectName("ghost")
+        self._check_now_btn.setCursor(Qt.PointingHandCursor)
+        self._check_now_btn.clicked.connect(self._on_check_for_updates)
+        btn_row.addWidget(self._check_now_btn)
+
+        self._updates_card.add_layout(btn_row)
+
+    def _on_check_for_updates(self):
+        self._check_now_btn.setEnabled(False)
+        self._check_now_btn.setText("Checking...")
+        self._updates_status.setText("Checking for updates...")
+        self._updates_status.setStyleSheet(
+            f"color: {get_color('text_secondary')}; font-size: 12px; "
+            f"background: transparent; border: none;"
+        )
+
+        def _done(result):
+            self._check_now_btn.setEnabled(True)
+            self._check_now_btn.setText("Check Now")
+            if result is None:
+                self._updates_status.setText("Could not check for updates. Try again later.")
+                self._updates_status.setStyleSheet(
+                    f"color: {get_color('warning')}; font-size: 12px; "
+                    f"background: transparent; border: none;"
+                )
+                return
+            has_update, latest_version, release_notes, download_url = result
+            if has_update:
+                self._updates_status.setText("")
+                from core.version import __version__
+                from gui.widgets.update_checker_dialog import UpdateCheckerDialog
+                dialog = UpdateCheckerDialog(
+                    __version__, latest_version, release_notes, download_url, parent=self
+                )
+                dialog.update_ready_to_install.connect(self._on_update_install_ready)
+                dialog.exec()
+            else:
+                self._updates_status.setText("You are on the latest version.")
+                self._updates_status.setStyleSheet(
+                    f"color: {get_color('success')}; font-size: 12px; "
+                    f"background: transparent; border: none;"
+                )
+
+        def _error(err_msg):
+            self._check_now_btn.setEnabled(True)
+            self._check_now_btn.setText("Check Now")
+            self._updates_status.setText("Could not check for updates. Try again later.")
+            self._updates_status.setStyleSheet(
+                f"color: {get_color('warning')}; font-size: 12px; "
+                f"background: transparent; border: none;"
+            )
+
+        worker = Worker(check_for_update)
+        worker.signals.done.connect(_done)
+        worker.signals.error.connect(_error)
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_update_install_ready(self, zip_path):
+        app = QApplication.instance()
+        if app:
+            app.quit()
+
     # ── Auth signals ─────────────────────────────────────────────────────
 
     def _connect_signals(self):
@@ -499,6 +607,9 @@ class SettingsView(QWidget):
         bc = self._config.get("broadcast", {})
         self._image_gen_toggle.setChecked(bc.get("image_generation_enabled", True))
 
+        uc = self._config.get("updates", {})
+        self._updates_startup_toggle.setChecked(uc.get("check_on_startup", True))
+
     def _load_template_data(self):
         self._trade_editor._reload_template()
         self._update_editor._reload_template()
@@ -566,6 +677,10 @@ class SettingsView(QWidget):
         broadcast = current.get("broadcast", {})
         broadcast["image_generation_enabled"] = self._image_gen_toggle.isChecked()
         current["broadcast"] = broadcast
+
+        updates = current.get("updates", {})
+        updates["check_on_startup"] = self._updates_startup_toggle.isChecked()
+        current["updates"] = updates
 
         return current
 

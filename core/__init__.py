@@ -12,6 +12,7 @@ from core.paths import (
     TELEGRAM_SESSION_DIR,
 )
 from core.config import Config
+from core.version import __version__
 
 __all__ = [
     "ROOT_DIR",
@@ -26,4 +27,5 @@ __all__ = [
     "UPDATES_PATH",
     "TELEGRAM_SESSION_DIR",
     "Config",
+    "__version__",
 ]

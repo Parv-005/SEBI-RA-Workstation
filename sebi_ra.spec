@@ -77,3 +77,57 @@ coll = COLLECT(
     upx=True,
     name='SEBI_RA_Automation',
 )
+
+# --- Updater EXE (standalone, no console window) ---
+updater_a = Analysis(
+    ['updater.py'],
+    pathex=[str(ROOT)],
+    binaries=[],
+    datas=[],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        'PySide6',
+        'PySide6.QtWidgets',
+        'PySide6.QtCore',
+        'PySide6.QtGui',
+        'PySide6.QtNetwork',
+        'telethon',
+        'SmartApi',
+        'pyotp',
+        'gspread',
+        'openpyxl',
+        'PIL',
+        'google.oauth2',
+        'google.auth',
+        'tkinter',
+        'matplotlib',
+        'numpy',
+        'scipy',
+        'pytest',
+        'icecream',
+        'psd_tools',
+    ],
+    noarchive=False,
+    optimize=0,
+    cipher=block_cipher,
+)
+
+updater_pyz = PYZ(updater_a.pure, cipher=block_cipher)
+
+updater_exe = EXE(
+    updater_pyz,
+    updater_a.scripts,
+    updater_a.binaries,
+    updater_a.datas,
+    [],
+    name='updater',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    icon=None,
+)

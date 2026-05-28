@@ -1,4 +1,5 @@
 import json
+import shutil
 from functools import lru_cache
 from typing import Any
 
@@ -6,6 +7,16 @@ from core.paths import CONFIG_PATH
 from utils.logger import setup_logger
 
 logger = setup_logger("Config")
+
+
+def _auto_create_config():
+    example_path = CONFIG_PATH.parent / "config_example.json"
+    if not CONFIG_PATH.exists() and example_path.exists():
+        try:
+            shutil.copy2(example_path, CONFIG_PATH)
+            logger.info(f"First launch: copied config_example.json → config.json")
+        except OSError as e:
+            logger.warning(f"Could not create config.json from example: {e}")
 
 
 class Config:
@@ -22,6 +33,8 @@ class Config:
 
     @classmethod
     def _load(cls) -> dict[str, Any]:
+        if not CONFIG_PATH.exists():
+            _auto_create_config()
         if not CONFIG_PATH.exists():
             logger.warning(f"Config file not found at {CONFIG_PATH}, using empty defaults")
             return {}

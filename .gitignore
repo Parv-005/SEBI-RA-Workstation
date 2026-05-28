@@ -7,6 +7,9 @@ data/
 # Telethon session files
 *.session
 
+# Update artifacts
+update_instruction.json
+
 # Python
 __pycache__/
 *.py[cod]
