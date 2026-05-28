@@ -14,7 +14,7 @@ Trade automation software for SEBI Registered Advisers. Create, manage, and broa
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/SEBI_RA_Automation_Software.git
+git clone https://github.com/<your-username>/SEBI-RA-Workstation.git
 cd SEBI_RA_Automation_Software
 ```
 
