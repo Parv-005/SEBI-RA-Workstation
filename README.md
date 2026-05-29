@@ -63,6 +63,17 @@ sebi-ra
 - **Trade Management** — Track active/closed trades with status updates
 - **Auto-Updater** — Checks for new releases on startup, downloads and installs updates automatically
 
+## Screenshots
+
+### Active Trades
+![Active Trades](screenshots/active_trades.png)
+
+### New Trade Entry
+![New Trade Entry](screenshots/new_Trade_entry.png)
+
+### Settings Page
+![Settings Page](screenshots/settings_page.png)
+
 ## Configuration
 
 All credentials are configured through the **Settings** page in the app:
