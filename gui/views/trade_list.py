@@ -2,12 +2,16 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QTableView, QHeaderView, QSizePolicy
 )
-from PySide6.QtCore import Qt, QTimer, QSortFilterProxyModel
+from PySide6.QtCore import Qt, QTimer, QSortFilterProxyModel, QEvent
 from PySide6.QtGui import QFont, QColor, QPalette
 
-from gui.models.trade_table_model import TradeTableModel, TradeFilterModel, COL_WIDTHS
+from gui.models.trade_table_model import (
+    TradeTableModel, TradeFilterModel, COL_WIDTHS, COL_UPDATE,
+)
 from gui.signals import get_signals
 from gui.theme import get_color
+from gui.widgets.button_delegate import ButtonDelegate
+from gui.widgets.row_hover_delegate import RowHoverDelegate
 from gui.widgets.toast import ToastWidget
 from utils.constants import STATUSES, STATUS_COLORS, ACTION_COLORS, FILTER_ALL
 from utils.logger import setup_logger
@@ -76,8 +80,22 @@ class TradeListView(QWidget):
         self._table.setMouseTracking(True)
         self._table.setCursor(Qt.PointingHandCursor)
 
+        self._row_delegate = RowHoverDelegate(self._table)
+        self._table.setItemDelegate(self._row_delegate)
+
+        self._btn_delegate = ButtonDelegate(self._table, self._row_delegate)
+        self._table.setItemDelegateForColumn(COL_UPDATE, self._btn_delegate)
+
+        self._table.viewport().installEventFilter(self)
+
         header_view = self._table.horizontalHeader()
-        header_view.setStretchLastSection(True)
+        header_view.setStretchLastSection(False)
+        header_view.setSectionResizeMode(
+            COL_UPDATE - 1, QHeaderView.Stretch
+        )
+        header_view.setSectionResizeMode(
+            COL_UPDATE, QHeaderView.Fixed
+        )
         header_view.setSectionsClickable(True)
         header_view.setHighlightSections(False)
         header_view.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -149,9 +167,64 @@ class TradeListView(QWidget):
         )
 
     def _on_row_click(self, index):
+        if index.column() == COL_UPDATE:
+            return
         proxy_index = self._table.currentIndex()
         source_index = self._proxy.mapToSource(proxy_index)
         trade = self._model.trade_at(source_index.row())
         if trade:
             logger.debug(f"Trade selected: {trade.get('trade_code')}")
             self._signals.navigate.emit("trade_detail", trade)
+
+    def _open_update_dialog(self, trade):
+        from gui.views.update_dialog import UpdateDialog
+        dialog = UpdateDialog(trade, self._controller, self)
+        dialog.finished.connect(self._on_update_dialog_finished)
+        dialog.open()
+
+    def _on_update_dialog_finished(self, result):
+        if result == 1:
+            self._do_refresh()
+
+    def eventFilter(self, obj, event):
+        if obj is self._table.viewport():
+            et = event.type()
+            if et == QEvent.MouseMove:
+                pos = event.position().toPoint()
+                row = self._table.rowAt(pos.y())
+                col = self._table.columnAt(pos.x())
+                self._row_delegate.hover_row = row
+                if col == COL_UPDATE and row >= 0:
+                    self._btn_delegate.set_hover(row)
+                else:
+                    self._btn_delegate.clear_hover()
+            elif et == QEvent.Leave:
+                self._row_delegate.clear_pressed()
+                self._row_delegate.clear_hover()
+                self._btn_delegate.clear_hover()
+                self._btn_delegate.clear_pressed()
+            elif et == QEvent.MouseButtonPress:
+                pos = event.position().toPoint()
+                row = self._table.rowAt(pos.y())
+                col = self._table.columnAt(pos.x())
+                self._row_delegate.pressed_row = row
+                if col == COL_UPDATE and row >= 0:
+                    self._btn_delegate.set_pressed(row)
+                else:
+                    self._btn_delegate.clear_pressed()
+            elif et == QEvent.MouseButtonRelease:
+                pos = event.position().toPoint()
+                row = self._table.rowAt(pos.y())
+                col = self._table.columnAt(pos.x())
+                self._row_delegate.clear_pressed()
+                if col == COL_UPDATE and row >= 0 and self._btn_delegate._press_row == row:
+                    proxy_idx = self._proxy.index(row, col)
+                    source_idx = self._proxy.mapToSource(proxy_idx)
+                    trade = self._model.trade_at(source_idx.row())
+                    if trade:
+                        self._open_update_dialog(trade)
+                self._btn_delegate.clear_pressed()
+        return super().eventFilter(obj, event)
+
+    def refresh_style(self):
+        self._table.viewport().update()

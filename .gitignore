@@ -42,3 +42,4 @@ rough.py
 .ruff_cache/
 .opencode/
 logs/
+.understand-anything/

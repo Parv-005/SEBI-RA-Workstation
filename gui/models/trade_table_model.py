@@ -8,10 +8,12 @@ from utils.formatters import format_currency, format_date_short
 
 COLUMNS = [
     "Trade Code", "Date", "Stock", "Segment",
-    "Action", "Entry", "Target", "SL", "Status",
+    "Action", "Entry", "Target", "SL", "Status", "Update",
 ]
 
-COL_WIDTHS = [120, 95, 150, 85, 70, 100, 100, 100, 90]
+COL_WIDTHS = [120, 95, 150, 85, 70, 100, 100, 100, 90, 80]
+
+COL_UPDATE = len(COLUMNS) - 1
 
 
 class TradeTableModel(QAbstractTableModel):
@@ -67,6 +69,7 @@ class TradeTableModel(QAbstractTableModel):
             target_str,
             sl_str,
             status_text,
+            "",
         )
 
     def set_trades(self, trades):

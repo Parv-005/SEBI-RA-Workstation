@@ -311,10 +311,6 @@ QTableView::item {{
     border-bottom: none;
 }}
 
-QTableView::item:hover {{
-    background-color: {c['surface_hover']};
-}}
-
 QHeaderView::section {{
     background-color: {c['card_header_bg']};
     color: {c['text_secondary']};
